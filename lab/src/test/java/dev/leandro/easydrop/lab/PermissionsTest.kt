@@ -14,6 +14,7 @@ class PermissionsTest {
 
         assertFalse(Manifest.permission.ACCESS_FINE_LOCATION in permissions)
         assertTrue(Manifest.permission.NEARBY_WIFI_DEVICES in permissions)
+        assertTrue(Manifest.permission.POST_NOTIFICATIONS in permissions)
         assertTrue(Manifest.permission.BLUETOOTH_SCAN in permissions)
     }
 
@@ -23,6 +24,7 @@ class PermissionsTest {
 
         assertTrue(Manifest.permission.ACCESS_FINE_LOCATION in permissions)
         assertFalse(Manifest.permission.NEARBY_WIFI_DEVICES in permissions)
+        assertFalse(Manifest.permission.POST_NOTIFICATIONS in permissions)
         assertTrue(Manifest.permission.BLUETOOTH_SCAN in permissions)
     }
 

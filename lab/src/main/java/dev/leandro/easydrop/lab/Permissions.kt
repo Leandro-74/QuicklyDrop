@@ -15,6 +15,7 @@ internal fun requiredPermissions(sdk: Int): List<String> = buildList {
     }
     if (sdk >= Build.VERSION_CODES.TIRAMISU) {
         add(Manifest.permission.NEARBY_WIFI_DEVICES)
+        add(Manifest.permission.POST_NOTIFICATIONS)
     }
     if (sdk >= Build.VERSION_CODES.S) {
         add(Manifest.permission.BLUETOOTH_SCAN)

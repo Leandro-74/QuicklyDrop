@@ -36,12 +36,19 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.core.content.ContextCompat
+import dev.leandro.easydrop.lab.spike.SpikeActions
+import dev.leandro.easydrop.lab.spike.SpikeLog
+import dev.leandro.easydrop.lab.spike.SpikePayload
+import dev.leandro.easydrop.lab.spike.SpikePresence
+import dev.leandro.easydrop.lab.spike.SpikeReader
+import dev.leandro.easydrop.lab.spike.SpikeStore
 
 class MainActivity : ComponentActivity() {
 
     private lateinit var controller: LabController
     private var pendingAction: Intent? = null
     private var resumed = false
+    private var spikeReader: SpikeReader? = null
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -77,13 +84,27 @@ class MainActivity : ComponentActivity() {
         }
     }
 
+    override fun onStart() {
+        super.onStart()
+        SpikePresence.activityVisible = true
+        SpikeLog.event(this, "activity.start", SpikePresence.info(this))
+    }
+
     override fun onPause() {
         super.onPause()
         resumed = false
+        spikeReader?.stop()
+    }
+
+    override fun onStop() {
+        SpikePresence.activityVisible = false
+        SpikeLog.event(this, "activity.stop", SpikePresence.info(this))
+        super.onStop()
     }
 
     /** Sem isso, sair pelo "voltar" deixa sockets, hotspot e grupo P2P vivos. */
     override fun onDestroy() {
+        spikeReader?.stop()
         controller.stop(quiet = true)
         super.onDestroy()
     }
@@ -107,8 +128,63 @@ class MainActivity : ComponentActivity() {
                 role = intent.stringExtra("role", Role.entries),
             )
             "stop" -> controller.stop()
+            "spike-arm" -> spikeArm(intent)
+            "spike-disarm" -> {
+                SpikeStore.disarm(this)
+                SpikeLog.event(this, "arm.off")
+                LabLog.add("spike: desarmado")
+            }
+            "spike-log" -> SpikeLog.dump()
+            "spike-reset" -> {
+                SpikeLog.clear(this)
+                LabLog.clear()
+            }
+            "spike-fgs" -> SpikeActions.startForeground(this, "activity")
+            "spike-group" -> SpikeActions.createGroup(this, "activity")
+            "spike-info" -> SpikeLog.event(this, "info", SpikePresence.info(this))
+            "spike-read" -> spikeRead(intent)
+            "spike-read-stop" -> {
+                spikeReader?.stop()
+                spikeReader = null
+            }
             else -> LabLog.add("ação desconhecida: $action")
         }
+    }
+
+    private fun spikeArm(intent: Intent) {
+        val payload = intent.getStringExtra("payload")
+        val error = SpikePayload.validate(payload)
+        if (error != null) {
+            SpikeLog.event(this, "arm.rejected", error)
+            LabLog.add("spike: $error")
+            return
+        }
+
+        val fgs = intent.getBooleanExtra("fgs", true)
+        val group = intent.getBooleanExtra("group", true)
+        SpikeStore.arm(this, payload!!, fgs, group)
+        SpikeLog.event(
+            this,
+            "arm.on",
+            "payload=${payload.toByteArray().size}B fgs=$fgs group=$group",
+        )
+        LabLog.add("spike: armado (fgs=$fgs group=$group)")
+    }
+
+    private fun spikeRead(intent: Intent) {
+        val screenOn = intent.getBooleanExtra("screenOn", false)
+        val reader = SpikeReader(this).also { spikeReader = it }
+        reader.start(
+            screenOn = screenOn,
+            onPayload = { payload ->
+                SpikeLog.event(this, "reader.done", "payload=${payload.take(40)}")
+                LabLog.add("spike: leitura ok")
+            },
+            onError = { message ->
+                SpikeLog.event(this, "reader.error", message)
+                LabLog.add("spike: $message")
+            },
+        )
     }
 
     private inline fun <reified T : Enum<T>> Intent.stringExtra(key: String, values: List<T>): T =
