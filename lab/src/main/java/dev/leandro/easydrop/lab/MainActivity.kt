@@ -141,7 +141,15 @@ class MainActivity : ComponentActivity() {
             }
             "spike-fgs" -> SpikeActions.startForeground(this, "activity")
             "spike-group" -> SpikeActions.createGroup(this, "activity")
-            "spike-info" -> SpikeLog.event(this, "info", SpikePresence.info(this))
+            "spike-info" -> {
+                val config = SpikeStore.config(this)
+                SpikeLog.event(
+                    this,
+                    "info",
+                    "${SpikePresence.info(this)} armed=${config.payload != null} " +
+                        "fgs=${config.fgsOnTap} group=${config.groupOnTap}",
+                )
+            }
             "spike-read" -> spikeRead(intent)
             "spike-read-stop" -> {
                 spikeReader?.stop()
