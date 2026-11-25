@@ -15,6 +15,7 @@ dependencyResolutionManagement {
 }
 
 rootProject.name = "QuicklyDrop"
-include(":app")
+include(":core")
+include(":diag")
 include(":lab")
 include(":protocol")

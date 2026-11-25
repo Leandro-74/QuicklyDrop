@@ -31,10 +31,11 @@ jobs:
         run: >
           ./gradlew
           :protocol:test
+          :core:testDebugUnitTest
           :lab:testDebugUnitTest
-          :app:testDebugUnitTest
+          :diag:testDebugUnitTest
           :lab:assembleDebug
-          :app:assembleDebug
+          :diag:assembleDebug
           --console=plain
 
       - name: Upload results
@@ -44,6 +45,7 @@ jobs:
           name: test-results
           path: |
             protocol/build/test-results/test
+            core/build/test-results/testDebugUnitTest
             lab/build/test-results/testDebugUnitTest
-            app/build/test-results/testDebugUnitTest
+            diag/build/test-results/testDebugUnitTest
           if-no-files-found: ignore
