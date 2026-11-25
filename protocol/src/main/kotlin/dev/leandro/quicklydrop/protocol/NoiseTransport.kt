@@ -15,8 +15,6 @@ class NoiseTransport internal constructor(
     private val receiver: CipherState,
 ) {
 
-    val macLength: Int get() = sender.macLength
-
     fun encrypt(plaintext: ByteArray): ByteArray {
         val out = ByteArray(plaintext.size + sender.macLength)
         val length = try {

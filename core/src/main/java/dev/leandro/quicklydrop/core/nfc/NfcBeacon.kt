@@ -14,17 +14,11 @@ object NfcBeacon {
     var payload: ByteArray? = null
         private set
 
-    @Volatile
-    var onRead: (() -> Unit)? = null
-        private set
-
-    fun arm(discovery: DiscoveryPayload, onRead: (() -> Unit)? = null) {
+    fun arm(discovery: DiscoveryPayload) {
         payload = discovery.encode()
-        this.onRead = onRead
     }
 
     fun disarm() {
         payload = null
-        onRead = null
     }
 }

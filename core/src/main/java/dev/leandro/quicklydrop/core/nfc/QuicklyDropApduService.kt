@@ -11,14 +11,8 @@ import android.os.Bundle
  */
 class QuicklyDropApduService : HostApduService() {
 
-    override fun processCommandApdu(commandApdu: ByteArray?, extras: Bundle?): ByteArray {
-        val payload = NfcBeacon.payload
-        val response = ApduHandler.handle(commandApdu, payload)
-        if (payload != null && ApduHandler.isGetData(commandApdu)) {
-            NfcBeacon.onRead?.invoke()
-        }
-        return response
-    }
+    override fun processCommandApdu(commandApdu: ByteArray?, extras: Bundle?): ByteArray =
+        ApduHandler.handle(commandApdu, NfcBeacon.payload)
 
     override fun onDeactivated(reason: Int) = Unit
 }

@@ -42,7 +42,7 @@ class AndroidP2pTransport(
     override fun removeGroup() {
         val current = channel ?: return
         try {
-            action(2_000) { manager.removeGroup(current, it) }
+            action(REMOVE_TIMEOUT_MS) { manager.removeGroup(current, it) }
         } catch (_: P2pException) {
             // No group or a framework BUSY; there is nothing else to clean up here.
         }
@@ -78,7 +78,7 @@ class AndroidP2pTransport(
                 return info.groupOwnerAddress?.hostAddress
                     ?: throw P2pException("group formed without an owner address")
             }
-            sleep(500)
+            sleep(CONNECT_POLL_MS)
         }
         if (cancelled) throw P2pException("cancelled")
         throw P2pException("group did not form in ${groupTimeoutMs}ms")
@@ -124,11 +124,11 @@ class AndroidP2pTransport(
     }
 
     private fun awaitGroupFrequency(current: WifiP2pManager.Channel): Int {
-        val deadline = System.currentTimeMillis() + 5_000
+        val deadline = System.currentTimeMillis() + FREQUENCY_TIMEOUT_MS
         while (!cancelled && System.currentTimeMillis() < deadline) {
             val frequency = groupInfo(current)?.frequency ?: 0
             if (frequency > 0) return frequency
-            sleep(300)
+            sleep(FREQUENCY_POLL_MS)
         }
         if (cancelled) throw P2pException("cancelled")
         return 0
@@ -145,7 +145,7 @@ class AndroidP2pTransport(
         } catch (e: SecurityException) {
             throw P2pException("Wi-Fi Direct permission denied", e)
         }
-        latch.await(2, TimeUnit.SECONDS)
+        latch.await(GROUP_INFO_TIMEOUT_MS, TimeUnit.MILLISECONDS)
         return result.get()
     }
 
@@ -160,7 +160,7 @@ class AndroidP2pTransport(
         } catch (e: SecurityException) {
             throw P2pException("Wi-Fi Direct permission denied", e)
         }
-        latch.await(2, TimeUnit.SECONDS)
+        latch.await(GROUP_INFO_TIMEOUT_MS, TimeUnit.MILLISECONDS)
         return result.get()
     }
 
@@ -211,5 +211,13 @@ class AndroidP2pTransport(
         WifiP2pManager.BUSY -> "busy"
         WifiP2pManager.ERROR -> "error"
         else -> "code $reason"
+    }
+
+    private companion object {
+        const val REMOVE_TIMEOUT_MS = 2_000L
+        const val GROUP_INFO_TIMEOUT_MS = 2_000L
+        const val FREQUENCY_TIMEOUT_MS = 5_000L
+        const val FREQUENCY_POLL_MS = 300L
+        const val CONNECT_POLL_MS = 500L
     }
 }

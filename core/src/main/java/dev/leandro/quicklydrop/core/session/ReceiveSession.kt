@@ -56,7 +56,7 @@ class ReceiveSession(
     private var socket: Socket? = null
 
     @Volatile
-    var localPort: Int = config.port
+    internal var localPort: Int = config.port
         private set
 
     init {
@@ -75,6 +75,8 @@ class ReceiveSession(
             return TransferResult.Failure(TransferFailure.CANCELLED, "cancelled")
         }
 
+        var handshake: NoiseHandshake? = null
+        var secure: SecureChannel? = null
         val result = try {
             p2p.removeGroup()
             ensureActive()
@@ -89,13 +91,14 @@ class ReceiveSession(
             localPort = listening.localPort
             ensureActive()
 
-            val handshake = NoiseHandshake.responder()
+            val activeHandshake = NoiseHandshake.responder()
+            handshake = activeHandshake
             val payload = DiscoveryPayload(
                 name = displayName,
                 ssid = ssid,
                 pass = pass,
                 frequencyMhz = frequency,
-                noisePublicKey = handshake.localPublicKey(),
+                noisePublicKey = activeHandshake.localPublicKey(),
             )
             publish(payload)
             listener.onArmed(payload)
@@ -106,16 +109,17 @@ class ReceiveSession(
             ensureActive()
 
             accepted.soTimeout = config.handshakeTimeoutMs
-            NoiseStream.read(handshake, accepted.getInputStream())
-            NoiseStream.write(handshake, accepted.getOutputStream())
+            NoiseStream.read(activeHandshake, accepted.getInputStream())
+            NoiseStream.write(activeHandshake, accepted.getOutputStream())
             ensureActive()
 
             accepted.soTimeout = config.idleTimeoutMs
             val channel = SecureChannel(
                 input = accepted.getInputStream(),
                 output = accepted.getOutputStream(),
-                transport = handshake.split(),
+                transport = activeHandshake.split(),
             )
+            secure = channel
             TransferReceiver(channel, sink, listener).receive { cancelled.get() }
         } catch (e: SocketTimeoutException) {
             if (cancelled.get()) {
@@ -136,6 +140,8 @@ class ReceiveSession(
                 TransferResult.Failure(TransferFailure.IO, e.message ?: "receive failed", e)
             }
         } finally {
+            runCatching { secure?.destroy() }
+            runCatching { handshake?.destroy() }
             runCatching { clear() }
             closeQuietly()
             runCatching { p2p.close() }

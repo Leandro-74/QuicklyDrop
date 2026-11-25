@@ -50,10 +50,18 @@ class SendSession(
                 "unsupported transport: ${payload.transport}",
             )
         }
+        if (payload.ssid.isEmpty() || payload.pass.isEmpty()) {
+            return TransferResult.Failure(
+                TransferFailure.PROTOCOL,
+                "missing P2P credentials",
+            )
+        }
         if (cancelled.get()) {
             return TransferResult.Failure(TransferFailure.CANCELLED, "cancelled")
         }
 
+        var handshake: NoiseHandshake? = null
+        var secure: SecureChannel? = null
         val result = try {
             p2p.removeGroup()
             ensureActive()
@@ -66,17 +74,19 @@ class SendSession(
             ensureActive()
             connected.soTimeout = config.handshakeTimeoutMs
 
-            val handshake = NoiseHandshake.initiator(payload.noisePublicKey)
-            NoiseStream.write(handshake, connected.getOutputStream())
-            NoiseStream.read(handshake, connected.getInputStream())
+            val activeHandshake = NoiseHandshake.initiator(payload.noisePublicKey)
+            handshake = activeHandshake
+            NoiseStream.write(activeHandshake, connected.getOutputStream())
+            NoiseStream.read(activeHandshake, connected.getInputStream())
             ensureActive()
 
             connected.soTimeout = config.idleTimeoutMs
             val channel = SecureChannel(
                 input = connected.getInputStream(),
                 output = connected.getOutputStream(),
-                transport = handshake.split(),
+                transport = activeHandshake.split(),
             )
+            secure = channel
             TransferSender(channel, listener).send(files) { cancelled.get() }
         } catch (e: SocketTimeoutException) {
             if (cancelled.get()) {
@@ -97,6 +107,8 @@ class SendSession(
                 TransferResult.Failure(TransferFailure.IO, e.message ?: "send failed", e)
             }
         } finally {
+            runCatching { secure?.destroy() }
+            runCatching { handshake?.destroy() }
             runCatching { socket?.close() }
             socket = null
             runCatching { p2p.close() }

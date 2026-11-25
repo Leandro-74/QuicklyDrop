@@ -100,6 +100,25 @@ class SendSessionTest {
     }
 
     @Test
+    fun `rejects a p2p payload without credentials`() {
+        val payload = DiscoveryPayload(
+            name = "Receiver",
+            ssid = "",
+            pass = "",
+            frequencyMhz = 0,
+            noisePublicKey = ByteArray(32),
+        )
+
+        val result = SendSession(
+            p2p = FakeP2pTransport(),
+            files = emptyList(),
+        ).run(payload)
+
+        assertTrue("expected failure, got $result", result is TransferResult.Failure)
+        assertEquals(TransferFailure.PROTOCOL, (result as TransferResult.Failure).failure)
+    }
+
+    @Test
     fun `rejects a non p2p payload`() {
         val payload = DiscoveryPayload(
             name = "Receiver",

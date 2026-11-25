@@ -23,6 +23,9 @@ class NfcReader(private val activity: Activity) {
     @Volatile
     private var active = false
 
+    @Volatile
+    private var generation = 0
+
     fun problem(): String? = when {
         adapter == null -> "This device does not support NFC"
         !adapter.isEnabled -> "NFC is turned off"
@@ -40,7 +43,8 @@ class NfcReader(private val activity: Activity) {
         }
 
         active = true
-        val reader = NfcAdapter.ReaderCallback { tag -> onTag(tag, onPayload, onError) }
+        val session = ++generation
+        val reader = NfcAdapter.ReaderCallback { tag -> onTag(tag, session, onPayload, onError) }
         callback = reader
         runCatching {
             adapter?.enableReaderMode(activity, reader, READER_FLAGS, null)
@@ -53,6 +57,7 @@ class NfcReader(private val activity: Activity) {
 
     fun stop() {
         active = false
+        generation++
         if (callback == null) return
         callback = null
         runCatching { adapter?.disableReaderMode(activity) }
@@ -60,10 +65,11 @@ class NfcReader(private val activity: Activity) {
 
     private fun onTag(
         tag: Tag,
+        session: Int,
         onPayload: (DiscoveryPayload) -> Unit,
         onError: (String) -> Unit,
     ) {
-        if (!active) return
+        if (!active || session != generation) return
         val iso = IsoDep.get(tag) ?: return
 
         try {
@@ -71,26 +77,32 @@ class NfcReader(private val activity: Activity) {
             iso.timeout = 5_000
 
             val selected = iso.transceive(ApduHandler.SELECT_APDU)
-            if (selected.size < 2 || selected.last() != 0x00.toByte()) {
+            if (!isSuccess(selected)) {
                 fail(onError, "SELECT was rejected")
                 return
             }
 
             val response = iso.transceive(ApduHandler.GET_DATA_APDU)
-            if (response.size < 3) {
+            if (response.size < 3 || !isSuccess(response)) {
                 fail(onError, "short NFC response")
                 return
             }
 
             val payload = DiscoveryPayload.decode(response.copyOfRange(0, response.size - 2))
+            if (session != generation) return
             stop()
             handler.post { onPayload(payload) }
         } catch (e: Exception) {
-            if (active) fail(onError, "NFC read failed: ${e.message}")
+            if (active && session == generation) fail(onError, "NFC read failed: ${e.message}")
         } finally {
             runCatching { iso.close() }
         }
     }
+
+    private fun isSuccess(response: ByteArray): Boolean =
+        response.size >= 2 &&
+            response[response.size - 2] == 0x90.toByte() &&
+            response.last() == 0x00.toByte()
 
     private fun fail(onError: (String) -> Unit, message: String) {
         stop()
