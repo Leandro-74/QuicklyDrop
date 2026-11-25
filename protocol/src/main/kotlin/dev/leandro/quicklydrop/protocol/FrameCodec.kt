@@ -13,10 +13,10 @@ import java.nio.charset.CodingErrorAction
 import java.nio.charset.StandardCharsets
 
 /**
- * Codec binário dos frames.
+ * Binary frame codec.
  *
- * Formato: `u8 type`, `u8 flags`, payload. O framing de transporte (prefixo de tamanho)
- * fica em [writeTo]/[readFrom] e em [SecureChannel].
+ * Format: `u8 type`, `u8 flags`, payload. The transport framing (length prefix)
+ * lives in [writeTo]/[readFrom] and in [SecureChannel].
  */
 object FrameCodec {
 
@@ -41,7 +41,7 @@ object FrameCodec {
         companion object {
             fun fromCode(code: Int): Type =
                 entries.firstOrNull { it.code == code }
-                    ?: throw ProtocolException("tipo de frame desconhecido: $code")
+                    ?: throw ProtocolException("unknown frame type: $code")
         }
     }
 
@@ -54,7 +54,7 @@ object FrameCodec {
         when (frame) {
             is Frame.Offer -> {
                 if (frame.files.isEmpty() || frame.files.size > MAX_FILES) {
-                    throw ProtocolException("quantidade de arquivos inválida: ${frame.files.size}")
+                    throw ProtocolException("invalid file count: ${frame.files.size}")
                 }
                 data.writeShort(frame.files.size)
                 frame.files.forEach { file ->
@@ -66,7 +66,7 @@ object FrameCodec {
 
             is Frame.Accept -> {
                 data.writeIndex(frame.fileIndex)
-                if (frame.startOffset < 0) throw ProtocolException("offset negativo")
+                if (frame.startOffset < 0) throw ProtocolException("negative offset")
                 data.writeLong(frame.startOffset)
             }
 
@@ -77,10 +77,10 @@ object FrameCodec {
 
             is Frame.Data -> {
                 data.writeIndex(frame.fileIndex)
-                if (frame.offset < 0) throw ProtocolException("offset negativo")
+                if (frame.offset < 0) throw ProtocolException("negative offset")
                 data.writeLong(frame.offset)
                 if (frame.bytes.isEmpty() || frame.bytes.size > MAX_DATA) {
-                    throw ProtocolException("tamanho de dados inválido: ${frame.bytes.size}")
+                    throw ProtocolException("invalid data size: ${frame.bytes.size}")
                 }
                 data.writeInt(frame.bytes.size)
                 data.write(frame.bytes)
@@ -88,7 +88,7 @@ object FrameCodec {
 
             is Frame.End -> {
                 data.writeIndex(frame.fileIndex)
-                if (frame.sha256.size != 32) throw ProtocolException("SHA-256 deve ter 32 bytes")
+                if (frame.sha256.size != 32) throw ProtocolException("SHA-256 must be 32 bytes")
                 data.write(frame.sha256)
             }
 
@@ -108,34 +108,34 @@ object FrameCodec {
         data.flush()
         val bytes = out.toByteArray()
         if (bytes.size > MAX_PLAINTEXT) {
-            throw ProtocolException("frame de ${bytes.size} bytes acima do limite")
+            throw ProtocolException("frame of ${bytes.size} bytes exceeds the limit")
         }
         return bytes
     }
 
     fun decode(bytes: ByteArray): Frame {
-        if (bytes.size < 2) throw ProtocolException("frame curto")
+        if (bytes.size < 2) throw ProtocolException("short frame")
 
         val input = DataInputStream(ByteArrayInputStream(bytes))
         val type = try {
             Type.fromCode(input.readUnsignedByte())
         } catch (e: EOFException) {
-            throw ProtocolException("frame truncado", e)
+            throw ProtocolException("truncated frame", e)
         }
         val flags = input.readUnsignedByte()
-        if (flags != 0) throw ProtocolException("flags reservadas em uso: $flags")
+        if (flags != 0) throw ProtocolException("reserved flags in use: $flags")
 
         val frame = try {
             when (type) {
                 Type.OFFER -> {
                     val count = input.readUnsignedShort()
-                    if (count !in 1..MAX_FILES) throw ProtocolException("quantidade inválida: $count")
+                    if (count !in 1..MAX_FILES) throw ProtocolException("invalid count: $count")
                     val files = ArrayList<FileMeta>(count)
                     repeat(count) {
                         val name = input.readString(MAX_NAME)
-                        if (name.isEmpty()) throw ProtocolException("nome vazio")
+                        if (name.isEmpty()) throw ProtocolException("empty name")
                         val size = input.readLong()
-                        if (size < 0) throw ProtocolException("tamanho negativo")
+                        if (size < 0) throw ProtocolException("negative size")
                         val mime = input.readString(MAX_MIME)
                         files += FileMeta(name, size, mime)
                     }
@@ -145,7 +145,7 @@ object FrameCodec {
                 Type.ACCEPT -> {
                     val index = input.readIndex()
                     val offset = input.readLong()
-                    if (offset < 0) throw ProtocolException("offset negativo")
+                    if (offset < 0) throw ProtocolException("negative offset")
                     Frame.Accept(index, offset)
                 }
 
@@ -157,9 +157,9 @@ object FrameCodec {
                 Type.DATA -> {
                     val index = input.readIndex()
                     val offset = input.readLong()
-                    if (offset < 0) throw ProtocolException("offset negativo")
+                    if (offset < 0) throw ProtocolException("negative offset")
                     val length = input.readInt()
-                    if (length !in 1..MAX_DATA) throw ProtocolException("dados de $length bytes")
+                    if (length !in 1..MAX_DATA) throw ProtocolException("invalid data length: $length")
                     val payload = ByteArray(length)
                     input.readFully(payload)
                     Frame.Data(index, offset, payload)
@@ -185,14 +185,14 @@ object FrameCodec {
                 )
             }
         } catch (e: EOFException) {
-            throw ProtocolException("frame truncado", e)
+            throw ProtocolException("truncated frame", e)
         }
 
-        if (input.available() != 0) throw ProtocolException("bytes extras no frame")
+        if (input.available() != 0) throw ProtocolException("extra bytes in frame")
         return frame
     }
 
-    /** Escreve um frame com prefixo de tamanho, sem cifra. Usado em testes e no laboratório. */
+    /** Writes a length-prefixed frame without encryption. Used in tests and the lab. */
     fun writeTo(output: OutputStream, frame: Frame) {
         val bytes = encode(frame)
         output.write(ByteBuffer.allocate(4).putInt(bytes.size).array())
@@ -200,11 +200,11 @@ object FrameCodec {
         output.flush()
     }
 
-    /** Lê um frame com prefixo de tamanho, sem cifra. Retorna `null` no fim do stream. */
+    /** Reads a length-prefixed frame without encryption. Returns `null` at end of stream. */
     fun readFrom(input: InputStream): Frame? {
         val header = readExactly(input, 4, allowEof = true) ?: return null
         val length = ByteBuffer.wrap(header).int
-        if (length !in 1..MAX_PLAINTEXT) throw ProtocolException("tamanho de frame inválido: $length")
+        if (length !in 1..MAX_PLAINTEXT) throw ProtocolException("invalid frame length: $length")
         val bytes = readExactly(input, length, allowEof = false)!!
         return decode(bytes)
     }
@@ -221,7 +221,7 @@ object FrameCodec {
     }
 
     private fun DataOutputStream.writeIndex(index: Int) {
-        if (index !in 0..0xFFFF) throw ProtocolException("índice inválido: $index")
+        if (index !in 0..0xFFFF) throw ProtocolException("invalid index: $index")
         writeShort(index)
     }
 
@@ -229,14 +229,14 @@ object FrameCodec {
 
     private fun DataOutputStream.writeString(value: String, max: Int) {
         val bytes = value.toByteArray(StandardCharsets.UTF_8)
-        if (bytes.size > max) throw ProtocolException("string de ${bytes.size} bytes acima de $max")
+        if (bytes.size > max) throw ProtocolException("string of ${bytes.size} bytes exceeds $max")
         writeShort(bytes.size)
         write(bytes)
     }
 
     private fun DataInputStream.readString(max: Int): String {
         val length = readUnsignedShort()
-        if (length > max) throw ProtocolException("string de $length bytes acima de $max")
+        if (length > max) throw ProtocolException("string of $length bytes exceeds $max")
         val bytes = ByteArray(length)
         readFully(bytes)
         val decoder = StandardCharsets.UTF_8.newDecoder()
@@ -245,7 +245,7 @@ object FrameCodec {
         return try {
             decoder.decode(ByteBuffer.wrap(bytes)).toString()
         } catch (e: CharacterCodingException) {
-            throw ProtocolException("UTF-8 inválido", e)
+            throw ProtocolException("invalid UTF-8", e)
         }
     }
 
@@ -256,7 +256,7 @@ object FrameCodec {
             val count = input.read(bytes, read, length - read)
             if (count < 0) {
                 if (read == 0 && allowEof) return null
-                throw ProtocolException("stream terminou no meio do frame")
+                throw ProtocolException("stream ended in the middle of a frame")
             }
             read += count
         }

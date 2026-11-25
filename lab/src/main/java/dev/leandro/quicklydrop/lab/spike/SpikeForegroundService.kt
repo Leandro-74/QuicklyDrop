@@ -9,8 +9,8 @@ import android.content.pm.ServiceInfo
 import android.os.IBinder
 
 /**
- * Serviço em primeiro plano mínimo para medir se o Android permite promovê-lo a partir
- * do toque NFC. O tipo `connectedDevice` é o que o produto vai usar.
+ * Minimal foreground service to measure whether Android allows promoting it from the
+ * NFC tap. The `connectedDevice` type is the one the product will use.
  */
 class SpikeForegroundService : Service() {
 
@@ -64,7 +64,7 @@ class SpikeForegroundService : Service() {
         Notification.Builder(this, CHANNEL)
             .setSmallIcon(android.R.drawable.stat_sys_data_bluetooth)
             .setContentTitle("QuicklyDrop spike")
-            .setContentText("receptor ativo")
+            .setContentText("receiver active")
             .setOngoing(true)
             .build()
 }

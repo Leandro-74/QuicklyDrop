@@ -13,13 +13,13 @@ import android.os.Looper
 import java.net.InetAddress
 
 /**
- * Hotspot local + `WifiNetworkSpecifier`, com o TCP delegado ao [TcpLink].
+ * Local hotspot + `WifiNetworkSpecifier`, with TCP delegated to [TcpLink].
  *
- * **Quem recebe hospeda o hotspot.** Parece contraintuitivo, mas é o que dá velocidade:
- * o cliente de `WifiNetworkSpecifier` fica em economia de energia e recebe devagar
- * (medido 2,7 MB/s com Rx a 17 Mbps), enquanto transmite bem (229 Mbps). Deixando o
- * hotspot no lado que recebe, o cliente só envia, e o mesmo par de aparelhos saltou
- * de 2,7 para 12,7 MB/s.
+ * **The receiver hosts the hotspot.** It seems counterintuitive, but that is what gives
+ * speed: the `WifiNetworkSpecifier` client stays in power saving and receives slowly
+ * (measured 2.7 MB/s with Rx at 17 Mbps), while it transmits well (229 Mbps). Leaving the
+ * hotspot on the receiving side, the client only sends, and the same pair of devices
+ * jumped from 2.7 to 12.7 MB/s.
  */
 class HotspotLink(
     private val context: Context,
@@ -37,15 +37,15 @@ class HotspotLink(
     private var networkCallback: ConnectivityManager.NetworkCallback? = null
     private var wifiLock: WifiManager.WifiLock? = null
 
-    // ------------------------------------------------------------- receptor
+    // ------------------------------------------------------------- receiver
 
-    /** Sobe o hotspot e entrega as credenciais para quem for publicá-las (BLE, NFC). */
+    /** Starts the hotspot and hands the credentials to whoever will publish them (BLE, NFC). */
     fun host(onCredentials: (ssid: String, pass: String) -> Unit) {
-        onStatus(LabStatus(Phase.SEARCHING, "subindo hotspot local"))
+        onStatus(LabStatus(Phase.SEARCHING, "starting local hotspot"))
 
         val wifi = context.getSystemService(WifiManager::class.java)
         if (wifi == null) {
-            fail("WifiManager indisponível")
+            fail("WifiManager unavailable")
             return
         }
 
@@ -61,30 +61,30 @@ class HotspotLink(
                     val ssid = config?.SSID
                     val pass = config?.preSharedKey
                     if (ssid == null || pass == null) {
-                        fail("hotspot sem credenciais")
+                        fail("hotspot without credentials")
                         return
                     }
-                    LabLog.add("hotspot pronto ($ssid / ***)")
+                    LabLog.add("hotspot ready ($ssid / ***)")
                     onCredentials(ssid, pass)
                     tcp.serve()
                 }
 
                 override fun onFailed(reason: Int) {
-                    fail("hotspot falhou (reason=$reason)")
+                    fail("hotspot failed (reason=$reason)")
                 }
             },
             handler,
         )
     }
 
-    // ------------------------------------------------------------- emissor
+    // ------------------------------------------------------------- sender
 
     fun join(ssid: String, pass: String) {
-        onStatus(LabStatus(Phase.CONNECTING, "entrando no hotspot $ssid"))
+        onStatus(LabStatus(Phase.CONNECTING, "joining hotspot $ssid"))
 
         val cm = context.getSystemService(ConnectivityManager::class.java)
         if (cm == null) {
-            fail("ConnectivityManager indisponível")
+            fail("ConnectivityManager unavailable")
             return
         }
 
@@ -94,10 +94,10 @@ class HotspotLink(
             .build()
 
         /**
-         * Sem `removeCapability(INTERNET)` a rede deixa de ser "local-only". O Android
-         * marca redes locais como secundárias e o rádio entra em economia de energia —
-         * medido em 17 Mbps de Rx contra 229 Mbps de Tx, com RSSI -10. Como os sockets
-         * são presos a esta rede explicitamente, nada vaza para a internet.
+         * Without `removeCapability(INTERNET)` the network stops being "local-only". Android
+         * marks local networks as secondary and the radio enters power saving — measured at
+         * 17 Mbps Rx versus 229 Mbps Tx, with RSSI -10. Since the sockets are explicitly
+         * bound to this network, nothing leaks to the internet.
          */
         val request = NetworkRequest.Builder()
             .addTransportType(NetworkCapabilities.TRANSPORT_WIFI)
@@ -109,17 +109,17 @@ class HotspotLink(
                 this@HotspotLink.network = network
                 val gateway = gatewayOf(cm.getLinkProperties(network))
                 if (gateway == null) {
-                    fail("hotspot sem gateway")
+                    fail("hotspot without gateway")
                     return
                 }
-                LabLog.add("Wi-Fi: no hotspot, gateway=${gateway.hostAddress}")
-                onStatus(LabStatus(Phase.CONNECTED, "no hotspot", gateway.hostAddress))
+                LabLog.add("Wi-Fi: on hotspot, gateway=${gateway.hostAddress}")
+                onStatus(LabStatus(Phase.CONNECTED, "on hotspot", gateway.hostAddress))
                 acquireWifiLock()
                 tcp.send(gateway.hostAddress) { socket -> network.bindSocket(socket) }
             }
 
             override fun onUnavailable() {
-                fail("diálogo do hotspot recusado")
+                fail("hotspot dialog declined")
             }
         }
 
@@ -127,7 +127,7 @@ class HotspotLink(
         cm.requestNetwork(request, callback, 120_000)
     }
 
-    // -------------------------------------------------------------- comum
+    // -------------------------------------------------------------- common
 
     private fun gatewayOf(props: LinkProperties?): InetAddress? {
         val route = props?.routes?.firstOrNull { it.isDefaultRoute && it.gateway != null }
@@ -135,9 +135,9 @@ class HotspotLink(
     }
 
     /**
-     * Rede WNS é tratada como "secundária" e o rádio entra em economia de energia —
-     * medido em 0,8 MB/s contra 12 MB/s da mesma rede conectada normalmente. O lock
-     * de baixa latência tira o rádio desse modo enquanto durar a transferência.
+     * A WNS network is treated as "secondary" and the radio enters power saving —
+     * measured at 0.8 MB/s versus 12 MB/s on the same network connected normally. The
+     * low-latency lock takes the radio out of that mode for the duration of the transfer.
      */
     private fun acquireWifiLock() {
         val wifi = context.getSystemService(WifiManager::class.java) ?: return
@@ -145,8 +145,8 @@ class HotspotLink(
             .apply {
                 setReferenceCounted(false)
                 runCatching { acquire() }
-                    .onSuccess { LabLog.add("Wi-Fi: lock de baixa latência ativo") }
-                    .onFailure { LabLog.add("Wi-Fi: lock falhou — ${it.javaClass.simpleName}: ${it.message}") }
+                    .onSuccess { LabLog.add("Wi-Fi: low-latency lock active") }
+                    .onFailure { LabLog.add("Wi-Fi: lock failed — ${it.javaClass.simpleName}: ${it.message}") }
             }
     }
 

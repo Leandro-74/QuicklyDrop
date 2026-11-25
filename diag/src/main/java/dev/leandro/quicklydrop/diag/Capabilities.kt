@@ -15,8 +15,8 @@ data class Cap(
 )
 
 /**
- * Coleta o que o aparelho realmente oferece. É a saída mais importante da Fase 0:
- * sem isso, qualquer decisão de arquitetura é chute.
+ * Collects what the device actually offers. It is Phase 0's most important output:
+ * without it, any architecture decision is a guess.
  */
 object Capabilities {
 
@@ -83,7 +83,7 @@ object Capabilities {
             Cap(
                 "Root",
                 isRooted(),
-                if (isRooted()) "su encontrado / test-keys" else "não detectado (KernelSU esconde de apps comuns)",
+                if (isRooted()) "su found / test-keys" else "not detected (KernelSU hides from regular apps)",
             ),
         )
     }

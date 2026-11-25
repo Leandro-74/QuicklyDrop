@@ -2,7 +2,7 @@ package dev.leandro.quicklydrop.lab.spike
 
 import android.content.Context
 
-/** Configuração persistida do spike, para sobreviver à morte do processo. */
+/** Persisted spike configuration, to survive process death. */
 data class SpikeConfig(
     val payload: String?,
     val fgsOnTap: Boolean,
@@ -10,11 +10,11 @@ data class SpikeConfig(
 )
 
 /**
- * Guarda o payload e as opções em `SharedPreferences`.
+ * Stores the payload and options in `SharedPreferences`.
  *
- * O serviço HCE pode ser criado em um processo novo depois de um `force-stop` ou de o
- * sistema matar o app. Persistir o payload permite medir exatamente esse cenário; as
- * chaves reais do produto nunca vão para disco, mas o spike é uma ferramenta de teste.
+ * The HCE service may be created in a new process after a `force-stop` or after the
+ * system kills the app. Persisting the payload allows measuring exactly that scenario;
+ * the product's real keys never go to disk, but the spike is a test tool.
  */
 object SpikeStore {
 

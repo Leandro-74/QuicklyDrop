@@ -8,10 +8,11 @@ import android.os.Handler
 import android.os.Looper
 
 /**
- * O toque em si: um lado apresenta um cartão (HCE) com um texto, o outro lê por reader mode.
+ * The tap itself: one side presents a card (HCE) with a text, the other reads it in
+ * reader mode.
  *
- * Não sabe nada sobre hotspot ou Wi-Fi Direct — só entrega a string. Assim o mesmo toque
- * serve para qualquer transporte.
+ * It knows nothing about hotspot or Wi-Fi Direct — it only delivers the string. That way
+ * the same tap works for any transport.
  */
 class NfcBeam(private val activity: Activity) {
 
@@ -37,21 +38,21 @@ class NfcBeam(private val activity: Activity) {
 
     private var readerCallback: NfcAdapter.ReaderCallback? = null
 
-    /** Devolve o motivo de não dar para usar NFC, ou null se está tudo certo. */
+    /** Returns the reason NFC cannot be used, or null if everything is fine. */
     fun problem(): String? = when {
-        nfc == null -> "este aparelho não tem NFC"
-        !nfc.isEnabled -> "NFC desligado"
+        nfc == null -> "this device has no NFC"
+        !nfc.isEnabled -> "NFC turned off"
         else -> null
     }
 
-    /** Fica pronto para ser lido. [onRead] avisa que alguém encostou. */
+    /** Gets ready to be read. [onRead] reports that someone tapped. */
     fun present(payload: String, onRead: () -> Unit) {
         QuicklyDropApduService.payload = payload.toByteArray()
         QuicklyDropApduService.onRead = { handler.post { if (!finished) onRead() } }
-        LabLog.add("NFC: cartão pronto")
+        LabLog.add("NFC: card ready")
     }
 
-    /** Liga o reader mode e entrega o texto lido. */
+    /** Enables reader mode and delivers the text read. */
     fun read(onPayload: (String) -> Unit, onError: (String) -> Unit) {
         val callback = NfcAdapter.ReaderCallback { tag -> onTag(tag, onPayload, onError) }
         readerCallback = callback
@@ -59,8 +60,8 @@ class NfcBeam(private val activity: Activity) {
         handler.post {
             runCatching {
                 nfc.enableReaderMode(activity, callback, READER_FLAGS, null)
-            }.onFailure { onError("reader mode falhou: ${it.message}") }
-            LabLog.add("NFC: lendo, encoste no outro aparelho")
+            }.onFailure { onError("reader mode failed: ${it.message}") }
+            LabLog.add("NFC: reading, touch the other device")
         }
     }
 
@@ -69,7 +70,7 @@ class NfcBeam(private val activity: Activity) {
 
         val iso = IsoDep.get(tag)
         if (iso == null) {
-            LabLog.add("NFC: tag sem IsoDep, ignorando")
+            LabLog.add("NFC: tag without IsoDep, ignoring")
             return
         }
 
@@ -79,18 +80,18 @@ class NfcBeam(private val activity: Activity) {
 
             val selected = iso.transceive(SELECT)
             if (selected.size < 2 || selected.last() != 0x00.toByte()) {
-                onError("NFC: SELECT recusado")
+                onError("NFC: SELECT rejected")
                 return
             }
 
             val response = iso.transceive(GET_DATA)
             if (response.size < 3) {
-                onError("NFC: resposta curta")
+                onError("NFC: short response")
                 return
             }
 
             val payload = String(response.copyOfRange(0, response.size - 2))
-            LabLog.add("NFC: recebido (${payload.lineSequence().firstOrNull()})")
+            LabLog.add("NFC: received (${payload.lineSequence().firstOrNull()})")
             stopReader()
             onPayload(payload)
         } catch (e: Exception) {
@@ -104,7 +105,7 @@ class NfcBeam(private val activity: Activity) {
         val callback = readerCallback ?: return
         readerCallback = null
         runCatching { nfc?.disableReaderMode(activity) }
-        LabLog.add("NFC: leitura encerrada")
+        LabLog.add("NFC: read finished")
     }
 
     fun stop() {

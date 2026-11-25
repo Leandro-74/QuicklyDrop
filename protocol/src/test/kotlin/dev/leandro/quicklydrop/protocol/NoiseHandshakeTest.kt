@@ -27,10 +27,10 @@ class NoiseHandshakeTest {
     }
 
     @Test
-    fun `handshake completa e troca mensagens nos dois sentidos`() {
+    fun `handshake completes and exchanges messages in both directions`() {
         val session = complete()
-        val doEmissor = "emissor".toByteArray()
-        val doReceptor = "receptor".toByteArray()
+        val doEmissor = "sender".toByteArray()
+        val doReceptor = "receiver".toByteArray()
 
         assertArrayEquals(
             doEmissor,
@@ -43,7 +43,7 @@ class NoiseHandshakeTest {
     }
 
     @Test
-    fun `falha com chave publica errada`() {
+    fun `fails with the wrong public key`() {
         val real = NoiseHandshake.responder()
         val outro = NoiseHandshake.responder()
         val initiator = NoiseHandshake.initiator(real.localPublicKey())
@@ -55,7 +55,7 @@ class NoiseHandshakeTest {
     }
 
     @Test
-    fun `falha com mensagem adulterada`() {
+    fun `fails with a tampered message`() {
         val responder = NoiseHandshake.responder()
         val initiator = NoiseHandshake.initiator(responder.localPublicKey())
         val m1 = initiator.writeMessage()
@@ -67,7 +67,7 @@ class NoiseHandshakeTest {
     }
 
     @Test
-    fun `rejeita replay do mesmo ciphertext`() {
+    fun `rejects replay of the same ciphertext`() {
         val session = complete()
         val ciphertext = session.initiatorTransport.encrypt("x".toByteArray())
 
@@ -78,7 +78,7 @@ class NoiseHandshakeTest {
     }
 
     @Test
-    fun `prologo diferente falha`() {
+    fun `a different prologue fails`() {
         val responder = NoiseHandshake.responder()
         val initiator = NoiseHandshake.initiator(
             responder.localPublicKey(),
@@ -92,7 +92,7 @@ class NoiseHandshakeTest {
     }
 
     @Test
-    fun `mensagens do handshake tem 48 bytes`() {
+    fun `handshake messages have 48 bytes`() {
         val responder = NoiseHandshake.responder()
         val initiator = NoiseHandshake.initiator(responder.localPublicKey())
         val m1 = initiator.writeMessage()
@@ -104,12 +104,12 @@ class NoiseHandshakeTest {
     }
 
     @Test
-    fun `chave publica do responder tem 32 bytes`() {
+    fun `responder public key has 32 bytes`() {
         assertEquals(32, NoiseHandshake.responder().localPublicKey().size)
     }
 
     @Test
-    fun `iniciador nao tem chave estatica`() {
+    fun `initiator has no static key`() {
         val responder = NoiseHandshake.responder()
         val initiator = NoiseHandshake.initiator(responder.localPublicKey())
 
@@ -119,14 +119,14 @@ class NoiseHandshakeTest {
     }
 
     @Test
-    fun `rejeita chave publica de tamanho errado`() {
+    fun `rejects a public key of the wrong size`() {
         assertThrows(ProtocolException::class.java) {
             NoiseHandshake.initiator(ByteArray(31))
         }
     }
 
     @Test
-    fun `transporte rejeita ciphertext curto`() {
+    fun `transport rejects short ciphertext`() {
         val session = complete()
 
         assertThrows(ProtocolException::class.java) {

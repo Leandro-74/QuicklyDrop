@@ -7,45 +7,45 @@ import org.junit.Test
 class SpikeRecorderTest {
 
     @Test
-    fun `registra eventos em ordem com deslocamento`() {
+    fun `records events in order with offset`() {
         val recorder = SpikeRecorder()
 
-        recorder.record(1_000, "primeiro")
-        recorder.record(1_250, "segundo", "detalhe")
+        recorder.record(1_000, "first")
+        recorder.record(1_250, "second", "detail")
 
         val lines = recorder.lines()
         assertEquals(2, lines.size)
         assertTrue(lines[0].startsWith("+000000ms"))
-        assertTrue(lines[0].contains("primeiro"))
+        assertTrue(lines[0].contains("first"))
         assertTrue(lines[1].startsWith("+000250ms"))
-        assertTrue(lines[1].contains("segundo"))
-        assertTrue(lines[1].contains("detalhe"))
+        assertTrue(lines[1].contains("second"))
+        assertTrue(lines[1].contains("detail"))
     }
 
     @Test
-    fun `primeiro evento define a referencia de tempo`() {
+    fun `first event sets the time reference`() {
         val recorder = SpikeRecorder()
 
-        recorder.record(50_000, "inicio")
-        recorder.record(50_010, "fim")
+        recorder.record(50_000, "start")
+        recorder.record(50_010, "end")
 
         assertTrue(recorder.lines()[0].startsWith("+000000ms"))
         assertTrue(recorder.lines()[1].startsWith("+000010ms"))
     }
 
     @Test
-    fun `limita a quantidade de eventos`() {
+    fun `limits the number of events`() {
         val recorder = SpikeRecorder(maxEvents = 3)
 
-        repeat(5) { recorder.record(it.toLong(), "evento$it") }
+        repeat(5) { recorder.record(it.toLong(), "event$it") }
 
         assertEquals(3, recorder.size)
-        assertEquals("evento2", recorder.snapshot().first().name)
-        assertEquals("evento4", recorder.snapshot().last().name)
+        assertEquals("event2", recorder.snapshot().first().name)
+        assertEquals("event4", recorder.snapshot().last().name)
     }
 
     @Test
-    fun `clear zera eventos e referencia`() {
+    fun `clear resets events and reference`() {
         val recorder = SpikeRecorder()
         recorder.record(1_000, "a")
 
@@ -57,11 +57,11 @@ class SpikeRecorderTest {
     }
 
     @Test
-    fun `evento sem detalhe nao deixa espaco extra`() {
+    fun `event without detail leaves no extra space`() {
         val recorder = SpikeRecorder()
 
-        val line = recorder.record(0, "curto")
+        val line = recorder.record(0, "short")
 
-        assertEquals("+000000ms  curto", line)
+        assertEquals("+000000ms  short", line)
     }
 }

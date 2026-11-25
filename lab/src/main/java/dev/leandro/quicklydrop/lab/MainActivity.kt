@@ -60,7 +60,7 @@ class MainActivity : ComponentActivity() {
             ActivityResultContracts.RequestMultiplePermissions(),
         ) { result ->
             result.forEach { (permission, granted) ->
-                LabLog.add("permissão ${permission.substringAfterLast('.')} = $granted")
+                LabLog.add("permission ${permission.substringAfterLast('.')} = $granted")
             }
         }
 
@@ -102,7 +102,7 @@ class MainActivity : ComponentActivity() {
         super.onStop()
     }
 
-    /** Sem isso, sair pelo "voltar" deixa sockets, hotspot e grupo P2P vivos. */
+    /** Without this, leaving via back keeps sockets, hotspot and P2P group alive. */
     override fun onDestroy() {
         spikeReader?.stop()
         controller.stop(quiet = true)
@@ -116,7 +116,7 @@ class MainActivity : ComponentActivity() {
     }
 
     /**
-     * Permite dirigir o laboratório por adb, sem tocar na tela:
+     * Allows driving the lab over adb without touching the screen:
      *   adb shell am start -n dev.leandro.quicklydrop.lab/.MainActivity \
      *       --es action start --es mode LAN --es role RECEIVER
      */
@@ -132,7 +132,7 @@ class MainActivity : ComponentActivity() {
             "spike-disarm" -> {
                 SpikeStore.disarm(this)
                 SpikeLog.event(this, "arm.off")
-                LabLog.add("spike: desarmado")
+                LabLog.add("spike: disarmed")
             }
             "spike-log" -> SpikeLog.dump()
             "spike-reset" -> {
@@ -155,7 +155,7 @@ class MainActivity : ComponentActivity() {
                 spikeReader?.stop()
                 spikeReader = null
             }
-            else -> LabLog.add("ação desconhecida: $action")
+            else -> LabLog.add("unknown action: $action")
         }
     }
 
@@ -176,7 +176,7 @@ class MainActivity : ComponentActivity() {
             "arm.on",
             "payload=${payload.toByteArray().size}B fgs=$fgs group=$group",
         )
-        LabLog.add("spike: armado (fgs=$fgs group=$group)")
+        LabLog.add("spike: armed (fgs=$fgs group=$group)")
     }
 
     private fun spikeRead(intent: Intent) {
@@ -186,7 +186,7 @@ class MainActivity : ComponentActivity() {
             screenOn = screenOn,
             onPayload = { payload ->
                 SpikeLog.event(this, "reader.done", "payload=${payload.take(40)}")
-                LabLog.add("spike: leitura ok")
+                LabLog.add("spike: read ok")
             },
             onError = { message ->
                 SpikeLog.event(this, "reader.error", message)
@@ -214,13 +214,13 @@ private fun colorFor(phase: Phase): Color = when (phase) {
 }
 
 private fun labelFor(phase: Phase): String = when (phase) {
-    Phase.IDLE -> "parado"
-    Phase.SEARCHING -> "procurando"
-    Phase.FOUND -> "peer encontrado"
-    Phase.CONNECTING -> "conectando"
-    Phase.CONNECTED -> "CONECTADO"
-    Phase.TRANSFERRING -> "TRANSFERINDO"
-    Phase.ERROR -> "ERRO"
+    Phase.IDLE -> "stopped"
+    Phase.SEARCHING -> "searching"
+    Phase.FOUND -> "peer found"
+    Phase.CONNECTING -> "connecting"
+    Phase.CONNECTED -> "CONNECTED"
+    Phase.TRANSFERRING -> "TRANSFERRING"
+    Phase.ERROR -> "ERROR"
 }
 
 @Composable
@@ -307,7 +307,7 @@ private fun LabScreen(controller: LabController) {
                     ),
                     modifier = Modifier.weight(1f),
                 ) {
-                    Text("Iniciar")
+                    Text("Start")
                 }
                 Button(
                     onClick = { controller.stop() },
@@ -317,7 +317,7 @@ private fun LabScreen(controller: LabController) {
                     ),
                     modifier = Modifier.weight(1f),
                 ) {
-                    Text("Parar")
+                    Text("Stop")
                 }
             }
 

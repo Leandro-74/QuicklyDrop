@@ -1,6 +1,6 @@
 package dev.leandro.quicklydrop.protocol
 
-/** Metadados de um arquivo ofertado. */
+/** Metadata of an offered file. */
 data class FileMeta(
     val name: String,
     val size: Long,
@@ -8,14 +8,14 @@ data class FileMeta(
 ) {
     init {
         val nameBytes = name.toByteArray(Charsets.UTF_8)
-        require(nameBytes.isNotEmpty()) { "nome vazio" }
-        require(nameBytes.size <= 255) { "nome maior que 255 bytes" }
-        require(size >= 0) { "tamanho negativo" }
-        require(mime.toByteArray(Charsets.UTF_8).size <= 127) { "MIME maior que 127 bytes" }
+        require(nameBytes.isNotEmpty()) { "empty name" }
+        require(nameBytes.size <= 255) { "name longer than 255 bytes" }
+        require(size >= 0) { "negative size" }
+        require(mime.toByteArray(Charsets.UTF_8).size <= 127) { "MIME longer than 127 bytes" }
     }
 }
 
-/** Mensagens trocadas depois do handshake Noise. */
+/** Messages exchanged after the Noise handshake. */
 sealed interface Frame {
 
     data class Offer(val files: List<FileMeta>) : Frame
@@ -67,7 +67,7 @@ enum class RejectReason(val code: Int) {
     companion object {
         fun fromCode(code: Int): RejectReason =
             entries.firstOrNull { it.code == code }
-                ?: throw ProtocolException("motivo de rejeição desconhecido: $code")
+                ?: throw ProtocolException("unknown rejection reason: $code")
     }
 }
 
@@ -80,7 +80,7 @@ enum class AckStatus(val code: Int) {
     companion object {
         fun fromCode(code: Int): AckStatus =
             entries.firstOrNull { it.code == code }
-                ?: throw ProtocolException("status de ack desconhecido: $code")
+                ?: throw ProtocolException("unknown ack status: $code")
     }
 }
 
@@ -92,7 +92,7 @@ enum class CancelReason(val code: Int) {
     companion object {
         fun fromCode(code: Int): CancelReason =
             entries.firstOrNull { it.code == code }
-                ?: throw ProtocolException("motivo de cancelamento desconhecido: $code")
+                ?: throw ProtocolException("unknown cancellation reason: $code")
     }
 }
 
@@ -111,6 +111,6 @@ enum class ErrorCode(val code: Int) {
     companion object {
         fun fromCode(code: Int): ErrorCode =
             entries.firstOrNull { it.code == code }
-                ?: throw ProtocolException("código de erro desconhecido: $code")
+                ?: throw ProtocolException("unknown error code: $code")
     }
 }

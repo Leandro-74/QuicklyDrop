@@ -1,4 +1,4 @@
 package dev.leandro.quicklydrop.protocol
 
-/** Erro de protocolo: payload, frame ou handshake inválido. */
+/** Protocol error: invalid payload, frame, or handshake. */
 class ProtocolException(message: String, cause: Throwable? = null) : Exception(message, cause)

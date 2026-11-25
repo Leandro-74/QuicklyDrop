@@ -4,19 +4,19 @@ import android.nfc.cardemulation.HostApduService
 import android.os.Bundle
 
 /**
- * Base dos cartões HCE do spike.
+ * Base of the spike HCE cards.
  *
- * O cartão só responde a SELECT e GET DATA. GET DATA publica o payload persistido e
- * dispara as ações medidas: serviço em primeiro plano e criação do grupo P2P.
+ * The card only responds to SELECT and GET DATA. GET DATA publishes the persisted payload
+ * and triggers the measured actions: foreground service and P2P group creation.
  */
 abstract class SpikeApduBase : HostApduService() {
 
     companion object {
-        /** AID F0 51 44 52 4F 51, permissivo quanto à tela. */
+        /** AID F0 51 44 52 4F 51, permissive regarding the screen. */
         val AID_PERMISSIVE: ByteArray =
             byteArrayOf(0xF0.toByte(), 0x51, 0x44, 0x52, 0x4F, 0x51)
 
-        /** AID F0 51 44 52 4F 52, exige a tela ligada. */
+        /** AID F0 51 44 52 4F 52, requires the screen on. */
         val AID_SCREEN_ON: ByteArray =
             byteArrayOf(0xF0.toByte(), 0x51, 0x44, 0x52, 0x4F, 0x52)
 
@@ -78,12 +78,12 @@ abstract class SpikeApduBase : HostApduService() {
     }
 }
 
-/** Cartão permissivo: responde com a tela apagada. */
+/** Permissive card: responds with the screen off. */
 class SpikeApduService : SpikeApduBase() {
     override val label: String = "permissive"
 }
 
-/** Cartão estrito: só responde com a tela ligada. */
+/** Strict card: only responds with the screen on. */
 class SpikeScreenOnApduService : SpikeApduBase() {
     override val label: String = "screenOn"
 }

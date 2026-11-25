@@ -6,11 +6,11 @@ import android.os.Handler
 import android.os.Looper
 
 /**
- * Remove grupo P2P de execuções anteriores.
+ * Removes a P2P group from previous runs.
  *
- * O grupo sobrevive ao force-stop do app. Se ele fica para trás, o `connect` do outro
- * aparelho pode formar um grupo novo em vez de entrar no grupo que já existe, e o emissor
- * acaba conectando nele mesmo. Limpar antes de começar deixa o teste repetível.
+ * The group survives the app's force-stop. If it is left behind, the other device's
+ * `connect` may form a new group instead of joining the existing one, and the sender
+ * ends up connecting to itself. Cleaning up before starting keeps the test repeatable.
  */
 object P2pCleanup {
 
@@ -41,7 +41,7 @@ object P2pCleanup {
             },
         )
 
-        // Se o framework travar, não deixa o teste parado para sempre.
+        // If the framework hangs, do not leave the test waiting forever.
         handler.postDelayed({ finish() }, TIMEOUT_MS)
     }
 }

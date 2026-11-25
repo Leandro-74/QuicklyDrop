@@ -14,8 +14,8 @@ import android.os.ParcelUuid
 import java.util.UUID
 
 /**
- * Testa os transportes que sobraram depois que o Edge 50 Ultra se revelou sem Wi-Fi Aware:
- * hotspot local (LocalOnlyHotspot) e BLE (advertise + scan).
+ * Tests the transports that were left after the Edge 50 Ultra turned out to have no Wi-Fi Aware:
+ * local hotspot (LocalOnlyHotspot) and BLE (advertise + scan).
  */
 class RadioTests(
     private val context: Context,
@@ -38,58 +38,58 @@ class RadioTests(
     fun startHotspot() {
         val wifi = context.applicationContext.getSystemService(WifiManager::class.java)
         if (wifi == null) {
-            log("Hotspot: WifiManager indisponível")
+            log("Hotspot: WifiManager unavailable")
             return
         }
         if (hotspot != null) {
-            log("Hotspot: já ativo")
+            log("Hotspot: already active")
             return
         }
 
-        log("Hotspot: iniciando LocalOnlyHotspot")
+        log("Hotspot: starting LocalOnlyHotspot")
         try {
             wifi.startLocalOnlyHotspot(
                 object : WifiManager.LocalOnlyHotspotCallback() {
                     override fun onStarted(reservation: WifiManager.LocalOnlyHotspotReservation) {
                         hotspot = reservation
                         val config = reservation.wifiConfiguration
-                        log("Hotspot: ATIVO ssid='${config?.SSID}' senha='${config?.preSharedKey}'")
+                        log("Hotspot: ACTIVE ssid='${config?.SSID}' password='${config?.preSharedKey}'")
                     }
 
                     override fun onStopped() {
-                        log("Hotspot: encerrado")
+                        log("Hotspot: stopped")
                         hotspot = null
                     }
 
                     override fun onFailed(reason: Int) {
-                        log("Hotspot: FALHOU reason=$reason")
+                        log("Hotspot: FAILED reason=$reason")
                         hotspot = null
                     }
                 },
                 handler,
             )
         } catch (e: Exception) {
-            log("Hotspot: exceção ${e.javaClass.simpleName}: ${e.message}")
+            log("Hotspot: exception ${e.javaClass.simpleName}: ${e.message}")
         }
     }
 
     fun stopHotspot() {
         hotspot?.close()
         hotspot = null
-        log("Hotspot: solicitado encerramento")
+        log("Hotspot: stop requested")
     }
 
     // ------------------------------------------------------------ join (WNS)
 
     /**
-     * Caminho que o app real usa para entrar no hotspot do outro aparelho.
-     * Diferente de `cmd wifi connect-network`, aqui o Android mostra um diálogo do sistema
-     * pedindo confirmação — é a UX real do produto.
+     * Path the real app uses to join the other device's hotspot.
+     * Unlike `cmd wifi connect-network`, here Android shows a system dialog
+     * asking for confirmation — it is the product's real UX.
      */
     fun join(ssid: String, passphrase: String) {
         val cm = context.getSystemService(android.net.ConnectivityManager::class.java)
         if (cm == null) {
-            log("Join: ConnectivityManager indisponível")
+            log("Join: ConnectivityManager unavailable")
             return
         }
 
@@ -104,21 +104,21 @@ class RadioTests(
             .setNetworkSpecifier(specifier)
             .build()
 
-        log("Join: pedindo '$ssid' (o sistema deve mostrar o diálogo)")
+        log("Join: requesting '$ssid' (the system should show the dialog)")
 
         cm.requestNetwork(request, object : android.net.ConnectivityManager.NetworkCallback() {
             override fun onAvailable(network: android.net.Network) {
                 val props = cm.getLinkProperties(network)
                 val ips = props?.linkAddresses?.joinToString { it.address.hostAddress ?: "?" }
-                log("Join: CONECTADO — ips locais: $ips")
+                log("Join: CONNECTED — local ips: $ips")
             }
 
             override fun onUnavailable() {
-                log("Join: indisponível (diálogo recusado ou timeout)")
+                log("Join: unavailable (dialog declined or timeout)")
             }
 
             override fun onLost(network: android.net.Network) {
-                log("Join: rede perdida")
+                log("Join: network lost")
             }
         }, 60_000)
     }
@@ -130,17 +130,17 @@ class RadioTests(
     fun startBleAdvertise() {
         val bt = adapter()
         if (bt == null) {
-            log("BLE: adapter nulo")
+            log("BLE: adapter null")
             return
         }
         if (!bt.isEnabled) {
-            log("BLE: adapter desligado")
+            log("BLE: adapter off")
             return
         }
 
         val adv = bt.bluetoothLeAdvertiser
         if (adv == null) {
-            log("BLE: advertise não suportado")
+            log("BLE: advertise not supported")
             return
         }
         advertiser = adv
@@ -157,20 +157,20 @@ class RadioTests(
             .addServiceUuid(ParcelUuid(EASY_DROP_UUID))
             .build()
 
-        // 128 bits de UUID já ocupam 18 dos 31 bytes do pacote; o service data vai no
-        // scan response, que tem espaço próprio.
+        // A 128-bit UUID already takes up 18 of the packet's 31 bytes; the service data goes
+        // in the scan response, which has its own space.
         val scanResponse = AdvertiseData.Builder()
             .addServiceData(ParcelUuid(EASY_DROP_UUID), byteArrayOf(1, 0, 0, 1))
             .build()
 
-        log("BLE: iniciando advertise")
+        log("BLE: starting advertise")
         adv.startAdvertising(settings, data, scanResponse, object : AdvertiseCallback() {
             override fun onStartSuccess(settingsInEffect: AdvertiseSettings) {
-                log("BLE: advertise ATIVO (tx=${settingsInEffect.txPowerLevel})")
+                log("BLE: advertise ACTIVE (tx=${settingsInEffect.txPowerLevel})")
             }
 
             override fun onStartFailure(errorCode: Int) {
-                log("BLE: advertise FALHOU ($errorCode)")
+                log("BLE: advertise FAILED ($errorCode)")
             }
         })
     }
@@ -178,18 +178,18 @@ class RadioTests(
     fun stopBleAdvertise() {
         advertiser?.stopAdvertising(null)
         advertiser = null
-        log("BLE: advertise encerrado")
+        log("BLE: advertise stopped")
     }
 
     fun startBleScan() {
         val bt = adapter()
         if (bt == null || !bt.isEnabled) {
-            log("BLE: adapter indisponível/desligado")
+            log("BLE: adapter unavailable/off")
             return
         }
         val scan = bt.bluetoothLeScanner
         if (scan == null) {
-            log("BLE: scanner indisponível")
+            log("BLE: scanner unavailable")
             return
         }
         scanner = scan
@@ -209,8 +209,8 @@ class RadioTests(
                     quicklyDropHits++
                     bestQuicklyDrop = maxOf(bestQuicklyDrop, result.rssi)
                     log(
-                        "BLE: EASYDROP em $address rssi=${result.rssi} " +
-                            "data=${ours?.joinToString(",") ?: "sem dados"}",
+                        "BLE: EASYDROP at $address rssi=${result.rssi} " +
+                            "data=${ours?.joinToString(",") ?: "no data"}",
                     )
                 }
 
@@ -221,20 +221,20 @@ class RadioTests(
             }
 
             override fun onScanFailed(errorCode: Int) {
-                log("BLE: scan FALHOU ($errorCode)")
+                log("BLE: scan FAILED ($errorCode)")
             }
         }
 
-        log("BLE: scan por ${SCAN_MS / 1000}s")
+        log("BLE: scanning for ${SCAN_MS / 1000}s")
         scan.startScan(callback)
 
         handler.postDelayed({
             scan.stopScan(callback)
             val strongest = seen.maxByOrNull { it.value }
             log(
-                "BLE: scan encerrado — ${seen.size} dispositivos, " +
-                    "$quicklyDropHits anúncios QuicklyDrop, melhor rssi=$bestQuicklyDrop, " +
-                    "mais forte=${strongest?.key} (${strongest?.value} dBm)",
+                "BLE: scan finished — ${seen.size} devices, " +
+                    "$quicklyDropHits QuicklyDrop advertisements, best rssi=$bestQuicklyDrop, " +
+                    "strongest=${strongest?.key} (${strongest?.value} dBm)",
             )
         }, SCAN_MS)
     }

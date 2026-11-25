@@ -10,37 +10,37 @@ import org.junit.Test
 class SpikePayloadTest {
 
     @Test
-    fun `resposta carrega payload e status ok`() {
-        val response = SpikePayload.response("ola")
+    fun `response carries payload and ok status`() {
+        val response = SpikePayload.response("hi")
 
-        assertArrayEquals("ola".toByteArray() + byteArrayOf(0x90.toByte(), 0x00), response)
+        assertArrayEquals("hi".toByteArray() + byteArrayOf(0x90.toByte(), 0x00), response)
     }
 
     @Test
-    fun `payload nulo responde nao encontrado`() {
+    fun `null payload responds not found`() {
         assertArrayEquals(SpikePayload.notFound, SpikePayload.response(null))
-        assertEquals("payload vazio", SpikePayload.validate(null))
+        assertEquals("empty payload", SpikePayload.validate(null))
     }
 
     @Test
-    fun `payload vazio e rejeitado`() {
+    fun `empty payload is rejected`() {
         assertFalse(SpikePayload.isValid(""))
         assertFalse(SpikePayload.isValid("   "))
     }
 
     @Test
-    fun `limite conta bytes e nao caracteres`() {
-        // 126 caracteres de dois bytes = 252 bytes + 2 de status = 254, cabe.
+    fun `limit counts bytes and not characters`() {
+        // 126 two-byte characters = 252 bytes + 2 status = 254, it fits.
         val doisBytes = "ç".repeat(126)
         assertNull(SpikePayload.validate(doisBytes))
 
-        // 127 caracteres de dois bytes = 254 + 2 = 256, não cabe.
+        // 127 two-byte characters = 254 + 2 = 256, it does not fit.
         val excedente = "ç".repeat(127)
-        assertTrue(SpikePayload.validate(excedente)!!.contains("não cabe"))
+        assertTrue(SpikePayload.validate(excedente)!!.contains("does not fit"))
     }
 
     @Test
-    fun `payload no limite exato cabe`() {
+    fun `payload at the exact limit fits`() {
         val texto = "a".repeat(SpikePayload.MAX_APDU - 2)
 
         assertNull(SpikePayload.validate(texto))
@@ -48,14 +48,14 @@ class SpikePayloadTest {
     }
 
     @Test
-    fun `payload acima do limite responde nao encontrado`() {
+    fun `payload above the limit responds not found`() {
         val texto = "a".repeat(SpikePayload.MAX_APDU - 1)
 
         assertArrayEquals(SpikePayload.notFound, SpikePayload.response(texto))
     }
 
     @Test
-    fun `payload invalido nao expoe dados`() {
+    fun `invalid payload does not expose data`() {
         val response = SpikePayload.response(null)
 
         assertEquals(2, response.size)

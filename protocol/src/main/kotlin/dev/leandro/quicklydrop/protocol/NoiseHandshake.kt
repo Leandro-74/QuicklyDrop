@@ -6,10 +6,10 @@ import javax.crypto.BadPaddingException
 import javax.crypto.ShortBufferException
 
 /**
- * Handshake Noise NK.
+ * Noise NK handshake.
  *
- * O emissor é o iniciador e usa a chave pública recebida por NFC. O receptor é o
- * respondente e gera uma chave estática efêmera por janela de recebimento.
+ * The sender is the initiator and uses the public key received over NFC. The receiver
+ * is the responder and generates an ephemeral static key for each receive window.
  */
 class NoiseHandshake private constructor(
     private val state: HandshakeState,
@@ -30,11 +30,11 @@ class NoiseHandshake private constructor(
             prologue: ByteArray = DEFAULT_PROLOGUE,
         ): NoiseHandshake {
             if (responderPublicKey.size != 32) {
-                throw ProtocolException("chave pública do receptor deve ter 32 bytes")
+                throw ProtocolException("responder public key must be 32 bytes")
             }
             val state = newState(HandshakeState.INITIATOR)
             val remote = state.remotePublicKey
-                ?: throw ProtocolException("padrão NK sem chave remota")
+                ?: throw ProtocolException("NK pattern without a remote key")
             remote.setPublicKey(responderPublicKey, 0)
             state.setPrologue(prologue, 0, prologue.size)
             state.start()
@@ -44,7 +44,7 @@ class NoiseHandshake private constructor(
         fun responder(prologue: ByteArray = DEFAULT_PROLOGUE): NoiseHandshake {
             val state = newState(HandshakeState.RESPONDER)
             val local = state.localKeyPair
-                ?: throw ProtocolException("padrão NK sem chave local")
+                ?: throw ProtocolException("NK pattern without a local key")
             local.generateKeyPair()
             state.setPrologue(prologue, 0, prologue.size)
             state.start()
@@ -55,14 +55,14 @@ class NoiseHandshake private constructor(
             try {
                 HandshakeState(PROTOCOL_NAME, role)
             } catch (e: NoSuchAlgorithmException) {
-                throw ProtocolException("Noise indisponível", e)
+                throw ProtocolException("Noise unavailable", e)
             }
     }
 
-    /** Chave pública estática da sessão. Só existe no respondente. */
+    /** Static public key of the session. Only exists on the responder. */
     fun localPublicKey(): ByteArray {
         val local = state.localKeyPair
-            ?: throw ProtocolException("papel sem chave estática")
+            ?: throw ProtocolException("role without a static key")
         val key = ByteArray(local.publicKeyLength)
         local.getPublicKey(key, 0)
         return key
@@ -73,7 +73,7 @@ class NoiseHandshake private constructor(
         val length = try {
             state.writeMessage(out, 0, payload, 0, payload.size)
         } catch (e: ShortBufferException) {
-            throw ProtocolException("mensagem Noise grande demais", e)
+            throw ProtocolException("Noise message too large", e)
         }
         return out.copyOf(length)
     }
@@ -83,11 +83,11 @@ class NoiseHandshake private constructor(
         val length = try {
             state.readMessage(message, 0, message.size, out, 0)
         } catch (e: ShortBufferException) {
-            throw ProtocolException("mensagem Noise grande demais", e)
+            throw ProtocolException("Noise message too large", e)
         } catch (e: BadPaddingException) {
-            throw ProtocolException("handshake Noise inválido", e)
+            throw ProtocolException("invalid Noise handshake", e)
         } catch (e: IllegalArgumentException) {
-            throw ProtocolException("mensagem Noise inválida", e)
+            throw ProtocolException("invalid Noise message", e)
         }
         return out.copyOf(length)
     }
@@ -96,7 +96,7 @@ class NoiseHandshake private constructor(
         val pair = try {
             state.split()
         } catch (e: IllegalStateException) {
-            throw ProtocolException("handshake incompleto", e)
+            throw ProtocolException("incomplete handshake", e)
         }
         return NoiseTransport(pair.sender, pair.receiver)
     }

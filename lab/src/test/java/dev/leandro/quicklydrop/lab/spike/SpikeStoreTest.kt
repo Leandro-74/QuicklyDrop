@@ -18,7 +18,7 @@ class SpikeStoreTest {
     private val context: Context = RuntimeEnvironment.getApplication()
 
     @Test
-    fun `sem armar nao ha payload`() {
+    fun `without arming there is no payload`() {
         val config = SpikeStore.config(context)
 
         assertNull(config.payload)
@@ -27,18 +27,18 @@ class SpikeStoreTest {
     }
 
     @Test
-    fun `armar persiste payload e opcoes`() {
-        SpikeStore.arm(context, "teste\n123", fgsOnTap = false, groupOnTap = true)
+    fun `arming persists payload and options`() {
+        SpikeStore.arm(context, "test\n123", fgsOnTap = false, groupOnTap = true)
 
         val config = SpikeStore.config(context)
-        assertEquals("teste\n123", config.payload)
+        assertEquals("test\n123", config.payload)
         assertFalse(config.fgsOnTap)
         assertTrue(config.groupOnTap)
     }
 
     @Test
-    fun `desarmar remove o payload e mantem opcoes`() {
-        SpikeStore.arm(context, "teste", fgsOnTap = false, groupOnTap = false)
+    fun `disarming removes the payload and keeps options`() {
+        SpikeStore.arm(context, "test", fgsOnTap = false, groupOnTap = false)
 
         SpikeStore.disarm(context)
 
@@ -49,10 +49,10 @@ class SpikeStoreTest {
     }
 
     @Test
-    fun `armar de novo substitui o payload`() {
-        SpikeStore.arm(context, "primeiro", fgsOnTap = true, groupOnTap = true)
-        SpikeStore.arm(context, "segundo", fgsOnTap = true, groupOnTap = false)
+    fun `arming again replaces the payload`() {
+        SpikeStore.arm(context, "first", fgsOnTap = true, groupOnTap = true)
+        SpikeStore.arm(context, "second", fgsOnTap = true, groupOnTap = false)
 
-        assertEquals("segundo", SpikeStore.config(context).payload)
+        assertEquals("second", SpikeStore.config(context).payload)
     }
 }

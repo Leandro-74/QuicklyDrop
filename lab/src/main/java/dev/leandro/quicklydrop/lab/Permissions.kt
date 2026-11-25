@@ -4,10 +4,10 @@ import android.Manifest
 import android.os.Build
 
 /**
- * Permissões que o laboratório precisa pedir, por versão do Android.
+ * Permissions the lab needs to request, by Android version.
  *
- * Em API 33+ o Wi-Fi usa `NEARBY_WIFI_DEVICES`; pedir localização junto só gera um
- * diálogo a mais. Abaixo disso (e no Android 12), a localização continua necessária.
+ * On API 33+ Wi-Fi uses `NEARBY_WIFI_DEVICES`; requesting location as well only adds an
+ * extra dialog. Below that (and on Android 12), location is still required.
  */
 internal fun requiredPermissions(sdk: Int): List<String> = buildList {
     if (sdk < Build.VERSION_CODES.TIRAMISU) {

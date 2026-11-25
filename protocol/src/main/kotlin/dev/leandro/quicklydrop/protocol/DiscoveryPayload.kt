@@ -5,7 +5,7 @@ import java.nio.charset.CharacterCodingException
 import java.nio.charset.CodingErrorAction
 import java.nio.charset.StandardCharsets
 
-/** Transporte indicado no payload de descoberta. */
+/** Transport indicated in the discovery payload. */
 enum class Transport(val code: Int) {
     P2P(1),
     HOTSPOT(2),
@@ -14,15 +14,15 @@ enum class Transport(val code: Int) {
     companion object {
         fun fromCode(code: Int): Transport =
             entries.firstOrNull { it.code == code }
-                ?: throw ProtocolException("transporte desconhecido: $code")
+                ?: throw ProtocolException("unknown transport: $code")
     }
 }
 
 /**
- * Payload entregue pelo NFC (HCE).
+ * Payload delivered over NFC (HCE).
  *
- * Formato binário com tamanho por campo: newline em nome, SSID ou senha não quebra o
- * parsing. O tamanho máximo é 199 bytes, dentro do limite de APDU curta.
+ * Length-prefixed binary format: a newline in the name, SSID, or password does not
+ * break parsing. The maximum size is 199 bytes, within the short APDU limit.
  */
 class DiscoveryPayload(
     val name: String,
@@ -35,7 +35,7 @@ class DiscoveryPayload(
 
     private val key: ByteArray = noisePublicKey.copyOf()
 
-    /** Cópia defensiva da chave pública X25519 do receptor. */
+    /** Defensive copy of the receiver's X25519 public key. */
     val noisePublicKey: ByteArray get() = key.copyOf()
 
     init {
@@ -43,13 +43,13 @@ class DiscoveryPayload(
         val ssidBytes = ssid.toByteArray(StandardCharsets.UTF_8)
         val passBytes = pass.toByteArray(StandardCharsets.UTF_8)
 
-        require(nameBytes.isNotEmpty()) { "nome vazio" }
-        require(nameBytes.size <= MAX_NAME) { "nome maior que $MAX_NAME bytes" }
-        require(ssidBytes.size <= MAX_SSID) { "SSID maior que $MAX_SSID bytes" }
-        require(passBytes.size <= MAX_PASS) { "senha maior que $MAX_PASS bytes" }
-        require(ssid.isNotEmpty() || pass.isEmpty()) { "senha sem SSID" }
-        require(frequencyMhz in 0..0xFFFF) { "frequência fora de u16" }
-        require(key.size == KEY_SIZE) { "chave Noise deve ter $KEY_SIZE bytes" }
+        require(nameBytes.isNotEmpty()) { "empty name" }
+        require(nameBytes.size <= MAX_NAME) { "name longer than $MAX_NAME bytes" }
+        require(ssidBytes.size <= MAX_SSID) { "SSID longer than $MAX_SSID bytes" }
+        require(passBytes.size <= MAX_PASS) { "password longer than $MAX_PASS bytes" }
+        require(ssid.isNotEmpty() || pass.isEmpty()) { "password without SSID" }
+        require(frequencyMhz in 0..0xFFFF) { "frequency outside u16" }
+        require(key.size == KEY_SIZE) { "Noise key must be $KEY_SIZE bytes" }
     }
 
     private val hasCredentials: Boolean get() = ssid.isNotEmpty()
@@ -90,7 +90,7 @@ class DiscoveryPayload(
         return result
     }
 
-    /** Não inclui a senha. */
+    /** Does not include the password. */
     override fun toString(): String =
         "DiscoveryPayload(name=$name, ssid=$ssid, pass=***, frequencyMhz=$frequencyMhz, " +
             "transport=$transport, key=${key.size}B)"
@@ -108,34 +108,34 @@ class DiscoveryPayload(
         private const val FLAG_RESERVED = 0xF0
 
         fun decode(bytes: ByteArray): DiscoveryPayload {
-            if (bytes.size < 2) throw ProtocolException("payload curto")
+            if (bytes.size < 2) throw ProtocolException("short payload")
 
             val buffer = ByteBuffer.wrap(bytes)
             val version = buffer.get().toInt() and 0xFF
-            if (version != VERSION) throw ProtocolException("versão $version não suportada")
+            if (version != VERSION) throw ProtocolException("unsupported version $version")
 
             val flags = buffer.get().toInt() and 0xFF
-            if (flags and FLAG_RESERVED != 0) throw ProtocolException("flags reservadas em uso")
+            if (flags and FLAG_RESERVED != 0) throw ProtocolException("reserved flags in use")
 
             val transport = Transport.fromCode(flags and 0x03)
             val hasCredentials = flags and FLAG_CREDENTIALS != 0
             val hasKey = flags and FLAG_NOISE_KEY != 0
-            if (!hasKey) throw ProtocolException("chave Noise ausente")
+            if (!hasKey) throw ProtocolException("missing Noise key")
 
             val name = readString(buffer, MAX_NAME)
             val ssid = readString(buffer, MAX_SSID)
             val pass = readString(buffer, MAX_PASS)
 
-            if (buffer.remaining() < 2 + KEY_SIZE) throw ProtocolException("payload truncado")
+            if (buffer.remaining() < 2 + KEY_SIZE) throw ProtocolException("truncated payload")
             val frequency = buffer.getShort().toInt() and 0xFFFF
             val key = ByteArray(KEY_SIZE)
             buffer.get(key)
-            if (buffer.hasRemaining()) throw ProtocolException("bytes extras no payload")
+            if (buffer.hasRemaining()) throw ProtocolException("extra bytes in payload")
 
-            if (name.isEmpty()) throw ProtocolException("nome vazio")
-            if (hasCredentials && ssid.isEmpty()) throw ProtocolException("credenciais ausentes")
+            if (name.isEmpty()) throw ProtocolException("empty name")
+            if (hasCredentials && ssid.isEmpty()) throw ProtocolException("missing credentials")
             if (!hasCredentials && (ssid.isNotEmpty() || pass.isNotEmpty())) {
-                throw ProtocolException("credenciais inesperadas")
+                throw ProtocolException("unexpected credentials")
             }
 
             return DiscoveryPayload(name, ssid, pass, frequency, key, transport)
@@ -143,16 +143,16 @@ class DiscoveryPayload(
 
         private fun putString(buffer: ByteBuffer, value: String) {
             val bytes = value.toByteArray(StandardCharsets.UTF_8)
-            if (bytes.size > 0xFF) throw ProtocolException("string longa demais")
+            if (bytes.size > 0xFF) throw ProtocolException("string too long")
             buffer.put(bytes.size.toByte())
             buffer.put(bytes)
         }
 
         private fun readString(buffer: ByteBuffer, max: Int): String {
-            if (buffer.remaining() < 1) throw ProtocolException("payload truncado")
+            if (buffer.remaining() < 1) throw ProtocolException("truncated payload")
             val length = buffer.get().toInt() and 0xFF
-            if (length > max) throw ProtocolException("string de $length bytes acima do limite $max")
-            if (buffer.remaining() < length) throw ProtocolException("payload truncado")
+            if (length > max) throw ProtocolException("string of $length bytes exceeds the limit $max")
+            if (buffer.remaining() < length) throw ProtocolException("truncated payload")
             val bytes = ByteArray(length)
             buffer.get(bytes)
             return decodeUtf8(bytes)
@@ -165,7 +165,7 @@ class DiscoveryPayload(
             return try {
                 decoder.decode(ByteBuffer.wrap(bytes)).toString()
             } catch (e: CharacterCodingException) {
-                throw ProtocolException("UTF-8 inválido", e)
+                throw ProtocolException("invalid UTF-8", e)
             }
         }
     }

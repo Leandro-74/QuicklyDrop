@@ -9,8 +9,8 @@ import java.util.Date
 import java.util.Locale
 
 /**
- * Log único do app. Escreve no logcat (tag QuicklyDropDiag) e mantém a lista que a UI mostra,
- * para que o mesmo relatório possa ser lido via `adb logcat` sem depender da tela.
+ * Single log for the app. Writes to logcat (tag QuicklyDropDiag) and keeps the list the UI shows,
+ * so the same report can be read via `adb logcat` without depending on the screen.
  */
 object DiagLog {
 

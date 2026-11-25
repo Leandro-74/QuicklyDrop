@@ -21,11 +21,11 @@ import android.os.ParcelUuid
 import java.util.UUID
 
 /**
- * Identificação por proximidade via BLE: quem recebe anuncia um UUID próprio e publica as
- * credenciais do seu hotspot por GATT. Quem envia escaneia, escolhe o anúncio mais forte,
- * lê as credenciais e entra na rede para empurrar os dados.
+ * Proximity identification over BLE: the receiver advertises its own UUID and publishes
+ * its hotspot credentials over GATT. The sender scans, picks the strongest advertisement,
+ * reads the credentials and joins the network to push the data.
  *
- * Funciona a alguns metros — é o modo "estou perto", não o modo "encostei".
+ * It works within a few meters — it is the "I am near" mode, not the "I touched" mode.
  */
 class BleMode(
     private val context: Context,
@@ -61,13 +61,13 @@ class BleMode(
 
     fun start() {
         if (bluetooth?.isEnabled != true) {
-            fail("Bluetooth desligado")
+            fail("Bluetooth off")
             return
         }
         if (role == Role.RECEIVER) startReceiver() else startSender()
     }
 
-    // ------------------------------------------------------------- receptor
+    // ------------------------------------------------------------- receiver
 
     private fun startReceiver() {
         link.host { ssid, pass ->
@@ -93,7 +93,7 @@ class BleMode(
             context,
             object : BluetoothGattServerCallback() {
                 override fun onConnectionStateChange(device: BluetoothDevice, status: Int, newState: Int) {
-                    LabLog.add("BLE: GATT $newState de ${device.address}")
+                    LabLog.add("BLE: GATT $newState from ${device.address}")
                 }
 
                 override fun onCharacteristicReadRequest(
@@ -102,7 +102,7 @@ class BleMode(
                     offset: Int,
                     characteristic: BluetoothGattCharacteristic,
                 ) {
-                    LabLog.add("BLE: credenciais lidas por ${device.address}")
+                    LabLog.add("BLE: credentials read by ${device.address}")
                     gattServer?.sendResponse(device, requestId, BluetoothGatt.GATT_SUCCESS, offset, payload)
                     stopAdvertising()
                 }
@@ -110,12 +110,12 @@ class BleMode(
         )
 
         if (server == null) {
-            fail("GATT server indisponível")
+            fail("GATT server unavailable")
             return
         }
 
         if (!server.addService(service)) {
-            fail("falha ao registrar serviço GATT")
+            fail("failed to register GATT service")
             return
         }
 
@@ -125,7 +125,7 @@ class BleMode(
     private fun advertise() {
         val adv = bluetooth?.bluetoothLeAdvertiser
         if (adv == null) {
-            fail("advertise BLE não suportado")
+            fail("BLE advertise not supported")
             return
         }
         advertiser = adv
@@ -143,12 +143,12 @@ class BleMode(
 
         val callback = object : AdvertiseCallback() {
             override fun onStartSuccess(settingsInEffect: AdvertiseSettings) {
-                LabLog.add("BLE: anunciando, esperando peer")
-                onStatus(LabStatus(Phase.SEARCHING, "anunciando, esperando peer"))
+                LabLog.add("BLE: advertising, waiting for peer")
+                onStatus(LabStatus(Phase.SEARCHING, "advertising, waiting for peer"))
             }
 
             override fun onStartFailure(errorCode: Int) {
-                fail("advertise falhou ($errorCode)")
+                fail("advertise failed ($errorCode)")
             }
         }
 
@@ -163,16 +163,16 @@ class BleMode(
         advertiseCallback = null
     }
 
-    // ------------------------------------------------------------- emissor
+    // ------------------------------------------------------------- sender
 
     private fun startSender() {
         val scan = bluetooth?.bluetoothLeScanner
         if (scan == null) {
-            fail("scanner BLE indisponível")
+            fail("BLE scanner unavailable")
             return
         }
         scanner = scan
-        onStatus(LabStatus(Phase.SEARCHING, "escaneando por QuicklyDrop"))
+        onStatus(LabStatus(Phase.SEARCHING, "scanning for QuicklyDrop"))
 
         val filter = ScanFilter.Builder()
             .setServiceUuid(ParcelUuid(SERVICE_UUID))
@@ -185,16 +185,16 @@ class BleMode(
         val callback = object : ScanCallback() {
             override fun onScanResult(callbackType: Int, result: ScanResult) {
                 val rssi = result.rssi
-                LabLog.add("BLE: anúncio de ${result.device.address} rssi=$rssi")
+                LabLog.add("BLE: advertisement from ${result.device.address} rssi=$rssi")
                 if (rssi < RSSI_THRESHOLD) return
 
                 stopScan()
-                onStatus(LabStatus(Phase.FOUND, "peer a $rssi dBm", result.device.address))
+                onStatus(LabStatus(Phase.FOUND, "peer at $rssi dBm", result.device.address))
                 connectGatt(result.device)
             }
 
             override fun onScanFailed(errorCode: Int) {
-                fail("scan falhou ($errorCode)")
+                fail("scan failed ($errorCode)")
             }
         }
 
@@ -204,7 +204,7 @@ class BleMode(
         handler.postDelayed({
             if (scanCallback != null) {
                 stopScan()
-                if (!finished) fail("nenhum peer em ${SCAN_MS / 1000}s")
+                if (!finished) fail("no peer within ${SCAN_MS / 1000}s")
             }
         }, SCAN_MS)
     }
@@ -218,7 +218,7 @@ class BleMode(
 
     private fun connectGatt(device: BluetoothDevice) {
         gattAttempts++
-        onStatus(LabStatus(Phase.CONNECTING, "lendo credenciais por GATT", device.address))
+        onStatus(LabStatus(Phase.CONNECTING, "reading credentials over GATT", device.address))
 
         runCatching { gatt?.close() }
         gatt = device.connectGatt(
@@ -232,10 +232,10 @@ class BleMode(
                         newState == BluetoothGatt.STATE_DISCONNECTED && !finished -> {
                             runCatching { gatt.close() }
                             if (gattAttempts < MAX_GATT_ATTEMPTS) {
-                                LabLog.add("BLE: GATT caiu, nova tentativa ${gattAttempts + 1}/$MAX_GATT_ATTEMPTS")
+                                LabLog.add("BLE: GATT dropped, retry ${gattAttempts + 1}/$MAX_GATT_ATTEMPTS")
                                 handler.postDelayed({ if (!finished) connectGatt(device) }, 600)
                             } else {
-                                fail("GATT desconectou antes das credenciais")
+                                fail("GATT disconnected before the credentials")
                             }
                         }
                     }
@@ -243,7 +243,7 @@ class BleMode(
 
                 override fun onServicesDiscovered(gatt: BluetoothGatt, status: Int) {
                     if (gatt.getService(SERVICE_UUID)?.getCharacteristic(CONFIG_UUID) == null) {
-                        fail("serviço GATT sem característica")
+                        fail("GATT service without characteristic")
                         return
                     }
                     gatt.requestMtu(185)
@@ -252,13 +252,13 @@ class BleMode(
                 override fun onMtuChanged(gatt: BluetoothGatt, mtu: Int, status: Int) {
                     val characteristic = gatt.getService(SERVICE_UUID)?.getCharacteristic(CONFIG_UUID)
                     if (characteristic == null) {
-                        fail("serviço GATT perdido")
+                        fail("GATT service lost")
                         return
                     }
                     handler.postDelayed({ gatt.readCharacteristic(characteristic) }, 150)
                 }
 
-                @Deprecated("API antiga, mas é a que o Android entrega")
+                @Deprecated("old API, but it is the one Android delivers")
                 override fun onCharacteristicRead(
                     gatt: BluetoothGatt,
                     characteristic: BluetoothGattCharacteristic,
@@ -282,17 +282,17 @@ class BleMode(
 
     private fun onCredentials(value: ByteArray?) {
         if (value == null) {
-            fail("credenciais vazias")
+            fail("empty credentials")
             return
         }
 
         val parts = String(value).split("\n")
         if (parts.size < 2) {
-            fail("credenciais inválidas: ${String(value)}")
+            fail("invalid credentials: ${String(value)}")
             return
         }
 
-        LabLog.add("BLE: credenciais recebidas (${parts[0]})")
+        LabLog.add("BLE: credentials received (${parts[0]})")
         runCatching { gatt?.close() }
         gatt = null
         stopScan()
@@ -315,6 +315,6 @@ class BleMode(
         runCatching { gatt?.close() }
         gatt = null
         link.stop()
-        LabLog.add("BLE: parado")
+        LabLog.add("BLE: stopped")
     }
 }

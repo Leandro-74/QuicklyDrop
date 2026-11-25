@@ -3,11 +3,12 @@ package dev.leandro.quicklydrop.lab
 import android.net.wifi.p2p.WifiP2pConfig
 
 /**
- * Monta a configuração de grupo/entrada sempre com SSID e senha.
+ * Builds the group/join configuration always with SSID and passphrase.
  *
- * O `WifiP2pConfig.Builder` lança `IllegalStateException` se a frequência for definida
- * sem credenciais — foi o crash da primeira versão do grupo forçado em 5 GHz. Com
- * SSID e senha, o framework usa o caminho de conexão rápida e não pede confirmação.
+ * `WifiP2pConfig.Builder` throws `IllegalStateException` if the frequency is set
+ * without credentials — that was the crash in the first version of the forced 5 GHz
+ * group. With SSID and passphrase, the framework uses the fast connection path and does
+ * not ask for confirmation.
  */
 internal object P2pConfig {
 
@@ -18,7 +19,7 @@ internal object P2pConfig {
             .apply { if (frequency > 0) setGroupOperatingFrequency(frequency) }
             .build()
             .apply {
-                // 0 = aceita ser cliente; quem cria o grupo já é o dono.
+                // 0 = accept being a client; whoever creates the group is already the owner.
                 groupOwnerIntent = 0
             }
 }

@@ -25,13 +25,13 @@ enum class Mode(val label: String) {
 }
 
 enum class Role(val label: String) {
-    SENDER("Emissor"),
-    RECEIVER("Receptor"),
+    SENDER("Sender"),
+    RECEIVER("Receiver"),
 }
 
 data class LabStatus(
     val phase: Phase = Phase.IDLE,
-    val detail: String = "escolha o modo e o papel",
+    val detail: String = "choose the mode and role",
     val peer: String? = null,
     val mbps: Double? = null,
     val setupMs: Long? = null,
@@ -40,8 +40,8 @@ data class LabStatus(
 )
 
 /**
- * Troca de modo/papel só vale parado. Depois de um erro, aceitar a troca e voltar para
- * [Phase.IDLE] evita o chip que parece clicável mas ignora o clique.
+ * Mode/role changes only apply while stopped. After an error, accepting the change and
+ * going back to [Phase.IDLE] avoids the chip that looks clickable but ignores the click.
  */
 fun LabStatus.choose(mode: Mode = this.mode, role: Role = this.role): LabStatus =
     if (phase == Phase.IDLE || phase == Phase.ERROR) LabStatus(mode = mode, role = role) else this

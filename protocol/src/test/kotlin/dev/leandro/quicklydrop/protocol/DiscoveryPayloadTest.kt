@@ -19,7 +19,7 @@ class DiscoveryPayloadTest {
     ) = DiscoveryPayload(name, ssid, pass, frequency, key, transport)
 
     @Test
-    fun `round trip preserva os campos`() {
+    fun `round trip preserves the fields`() {
         val original = sample()
         val decoded = DiscoveryPayload.decode(original.encode())
 
@@ -32,7 +32,7 @@ class DiscoveryPayloadTest {
     }
 
     @Test
-    fun `aceita newline no nome e no ssid`() {
+    fun `accepts a newline in the name and the ssid`() {
         val original = sample(name = "S21\nA", ssid = "Easy\nDrop")
         val decoded = DiscoveryPayload.decode(original.encode())
 
@@ -41,7 +41,7 @@ class DiscoveryPayloadTest {
     }
 
     @Test
-    fun `aceita rede aberta sem senha`() {
+    fun `accepts an open network without a password`() {
         val original = sample(ssid = "Open", pass = "")
         val decoded = DiscoveryPayload.decode(original.encode())
 
@@ -50,7 +50,7 @@ class DiscoveryPayloadTest {
     }
 
     @Test
-    fun `aceita payload sem credenciais`() {
+    fun `accepts a payload without credentials`() {
         val original = sample(ssid = "", pass = "")
         val decoded = DiscoveryPayload.decode(original.encode())
 
@@ -59,7 +59,7 @@ class DiscoveryPayloadTest {
     }
 
     @Test
-    fun `flags codificam transporte e capacidades`() {
+    fun `flags encode transport and capabilities`() {
         val p2p = sample(transport = Transport.P2P).encode()
         val hotspot = sample(transport = Transport.HOTSPOT).encode()
         val lan = sample(transport = Transport.LAN).encode()
@@ -74,7 +74,7 @@ class DiscoveryPayloadTest {
     }
 
     @Test
-    fun `payload maximo cabe no limite de apdu curta`() {
+    fun `maximum payload fits the short apdu limit`() {
         val original = sample(
             name = "n".repeat(DiscoveryPayload.MAX_NAME),
             ssid = "s".repeat(DiscoveryPayload.MAX_SSID),
@@ -88,18 +88,18 @@ class DiscoveryPayloadTest {
     }
 
     @Test
-    fun `rejeita versao desconhecida`() {
+    fun `rejects an unknown version`() {
         val bytes = sample().encode()
         bytes[0] = 2
 
         val error = assertThrows(ProtocolException::class.java) {
             DiscoveryPayload.decode(bytes)
         }
-        assertTrue(error.message!!.contains("versão"))
+        assertTrue(error.message!!.contains("version"))
     }
 
     @Test
-    fun `rejeita utf8 invalido`() {
+    fun `rejects invalid utf8`() {
         val bytes = sample(name = "A").encode()
         bytes[2] = 1
         bytes[3] = 0xFF.toByte()
@@ -110,7 +110,7 @@ class DiscoveryPayloadTest {
     }
 
     @Test
-    fun `rejeita payload truncado`() {
+    fun `rejects a truncated payload`() {
         val bytes = sample().encode().copyOf(sample().encode().size - 1)
 
         assertThrows(ProtocolException::class.java) {
@@ -119,7 +119,7 @@ class DiscoveryPayloadTest {
     }
 
     @Test
-    fun `rejeita bytes extras`() {
+    fun `rejects extra bytes`() {
         val bytes = sample().encode() + byteArrayOf(0)
 
         assertThrows(ProtocolException::class.java) {
@@ -128,7 +128,7 @@ class DiscoveryPayloadTest {
     }
 
     @Test
-    fun `rejeita credenciais ausentes quando a flag esta ligada`() {
+    fun `rejects missing credentials when the flag is set`() {
         val bytes = sample(ssid = "", pass = "").encode()
         bytes[1] = (bytes[1].toInt() or 0x04).toByte()
 
@@ -138,7 +138,7 @@ class DiscoveryPayloadTest {
     }
 
     @Test
-    fun `rejeita credenciais inesperadas quando a flag esta desligada`() {
+    fun `rejects unexpected credentials when the flag is clear`() {
         val bytes = sample().encode()
         bytes[1] = (bytes[1].toInt() and 0xFB).toByte()
 
@@ -148,28 +148,28 @@ class DiscoveryPayloadTest {
     }
 
     @Test
-    fun `rejeita chave noise de tamanho errado`() {
+    fun `rejects a noise key of the wrong size`() {
         assertThrows(IllegalArgumentException::class.java) {
             DiscoveryPayload("S21", "ssid", "pass", 5745, ByteArray(31))
         }
     }
 
     @Test
-    fun `rejeita nome vazio`() {
+    fun `rejects an empty name`() {
         assertThrows(IllegalArgumentException::class.java) {
             sample(name = "")
         }
     }
 
     @Test
-    fun `rejeita senha sem ssid`() {
+    fun `rejects a password without an ssid`() {
         assertThrows(IllegalArgumentException::class.java) {
             sample(ssid = "", pass = "12345678")
         }
     }
 
     @Test
-    fun `nao expoe a senha no toString`() {
+    fun `does not expose the password in toString`() {
         val text = sample().toString()
 
         assertTrue(text.contains("pass=***"))

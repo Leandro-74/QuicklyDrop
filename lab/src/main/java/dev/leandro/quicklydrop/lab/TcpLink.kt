@@ -10,11 +10,11 @@ import java.util.concurrent.Executors
 import kotlin.math.max
 
 /**
- * A transferência TCP de 16 MB, igual para qualquer transporte embaixo (hotspot local,
- * Wi-Fi Direct). Quem recebe chama [serve]; quem envia chama [send].
+ * The 16 MB TCP transfer, the same for any transport underneath (local hotspot,
+ * Wi-Fi Direct). The receiver calls [serve]; the sender calls [send].
  *
- * O socket ativo fica guardado para que [stop] consiga interromper uma transferência em
- * andamento: fechar o `ServerSocket` libera o `accept`, mas não o socket já aceito.
+ * The active socket is kept so that [stop] can interrupt a transfer in progress:
+ * closing the `ServerSocket` releases the `accept`, but not the already accepted socket.
  */
 class TcpLink(
     private val onStatus: (LabStatus) -> Unit,
@@ -28,13 +28,13 @@ class TcpLink(
         private const val CHUNK = 64 * 1024
         private const val ACCEPT_MS = 300_000
 
-        /** Depois de conectar, quanto esperar por dados antes de considerar a sessão morta. */
+        /** After connecting, how long to wait for data before considering the session dead. */
         private const val IDLE_MS = 30_000
 
-        /** Quanto o emissor espera o ACK final do receptor. */
+        /** How long the sender waits for the receiver's final ACK. */
         private const val ACK_MS = 10_000
 
-        /** Janela grande: com a padrão (64 KB) o RTT do specifier limita a ~3,7 MB/s. */
+        /** Large window: with the default (64 KB) the specifier RTT limits it to ~3.7 MB/s. */
         private const val SOCKET_BUFFER = 4 * 1024 * 1024
     }
 
@@ -52,7 +52,7 @@ class TcpLink(
     @Volatile
     private var finished = false
 
-    /** Sobe o servidor e espera alguém enviar. */
+    /** Starts the server and waits for someone to send. */
     fun serve() = serve(PORT)
 
     fun serve(port: Int, onReady: () -> Unit = {}) {
@@ -67,7 +67,7 @@ class TcpLink(
                 server = socketServer
                 onReady()
 
-                LabLog.add("TCP: servidor na porta $port")
+                LabLog.add("TCP: server on port $port")
                 val socket = socketServer.accept()
                 active = socket
                 tune(socket)
@@ -79,12 +79,12 @@ class TcpLink(
 
                 val setupMs = System.currentTimeMillis() - startedAt
                 val peer = socket.inetAddress?.hostAddress
-                LabLog.add("TCP: conectado em ${setupMs}ms com $peer")
-                onStatus(LabStatus(Phase.CONNECTED, "conectado em ${setupMs}ms", peer, setupMs = setupMs))
+                LabLog.add("TCP: connected in ${setupMs}ms with $peer")
+                onStatus(LabStatus(Phase.CONNECTED, "connected in ${setupMs}ms", peer, setupMs = setupMs))
 
                 if (finished) return@execute
 
-                onStatus(LabStatus(Phase.TRANSFERRING, "recebendo 16 MB", peer, setupMs = setupMs))
+                onStatus(LabStatus(Phase.TRANSFERRING, "receiving 16 MB", peer, setupMs = setupMs))
                 receive(socket, peer, setupMs)
             } catch (e: Exception) {
                 if (!finished) fail("TCP: ${e.message}")
@@ -96,7 +96,7 @@ class TcpLink(
         }
     }
 
-    /** Conecta no host e empurra os 16 MB. [prepare] ajusta o socket antes do connect. */
+    /** Connects to the host and pushes the 16 MB. [prepare] tunes the socket before connect. */
     fun send(host: String, prepare: (Socket) -> Unit = {}) = send(host, PORT, prepare)
 
     fun send(host: String, port: Int, prepare: (Socket) -> Unit = {}) {
@@ -114,12 +114,12 @@ class TcpLink(
                 if (finished) return@execute
 
                 val setupMs = System.currentTimeMillis() - startedAt
-                LabLog.add("TCP: conectado em ${setupMs}ms com $host")
-                onStatus(LabStatus(Phase.CONNECTED, "conectado em ${setupMs}ms", host, setupMs = setupMs))
+                LabLog.add("TCP: connected in ${setupMs}ms with $host")
+                onStatus(LabStatus(Phase.CONNECTED, "connected in ${setupMs}ms", host, setupMs = setupMs))
 
                 if (finished) return@execute
 
-                onStatus(LabStatus(Phase.TRANSFERRING, "enviando 16 MB", host, setupMs = setupMs))
+                onStatus(LabStatus(Phase.TRANSFERRING, "sending 16 MB", host, setupMs = setupMs))
 
                 val out = DataOutputStream(socket.getOutputStream())
                 val buffer = ByteArray(CHUNK)
@@ -134,24 +134,24 @@ class TcpLink(
                 }
                 out.flush()
 
-                // Só termina quando o receptor confirma que drenou os 16 MB. Sem isso,
-                // o buffer do socket faz o emissor parecer mais rápido do que a rede.
+                // Only finishes when the receiver confirms that the 16 MB were drained. Without
+                // this, the socket buffer makes the sender look faster than the network.
                 socket.soTimeout = ackMs
                 val ack = try {
                     socket.getInputStream().read()
                 } catch (e: SocketTimeoutException) {
-                    fail("TCP: receptor não confirmou em ${ackMs / 1000}s")
+                    fail("TCP: receiver did not acknowledge within ${ackMs / 1000}s")
                     return@execute
                 }
-                check(ack >= 0) { "receptor não confirmou" }
+                check(ack >= 0) { "receiver did not acknowledge" }
 
                 val seconds = max(1L, System.nanoTime() - start) / 1_000_000_000.0
                 val mbps = (PAYLOAD / 1024.0 / 1024.0) / seconds
-                LabLog.add("TCP: enviados 16 MB em %.2f s = %.1f MB/s".format(seconds, mbps))
+                LabLog.add("TCP: sent 16 MB in %.2f s = %.1f MB/s".format(seconds, mbps))
                 onStatus(
                     LabStatus(
                         Phase.CONNECTED,
-                        "enviado 16 MB",
+                        "sent 16 MB",
                         host,
                         mbps = mbps,
                         setupMs = setupMs,
@@ -175,14 +175,14 @@ class TcpLink(
             val start = System.nanoTime()
             var lastLog = start
 
-            // Taxa por segundo: mostra se a janela TCP está crescendo ou se bate num teto.
+            // Rate per second: shows whether the TCP window is growing or hitting a ceiling.
             while (received < PAYLOAD) {
                 if (finished) return
                 val want = minOf(buffer.size.toLong(), PAYLOAD - received).toInt()
                 val read = try {
                     input.read(buffer, 0, want)
                 } catch (e: SocketTimeoutException) {
-                    fail("TCP: sem dados por ${idleMs / 1000}s")
+                    fail("TCP: no data for ${idleMs / 1000}s")
                     return
                 }
                 if (read <= 0) break
@@ -194,7 +194,7 @@ class TcpLink(
                 }
             }
 
-            // Confirma para o emissor que tudo chegou; ele espera este byte.
+            // Confirms to the sender that everything arrived; it waits for this byte.
             if (received == PAYLOAD) {
                 socket.getOutputStream().write(1)
                 socket.getOutputStream().flush()
@@ -202,11 +202,11 @@ class TcpLink(
 
             val seconds = max(1L, System.nanoTime() - start) / 1_000_000_000.0
             val mbps = (received / 1024.0 / 1024.0) / seconds
-            LabLog.add("TCP: recebidos %.0f MB em %.2f s = %.1f MB/s".format(received / 1024.0 / 1024.0, seconds, mbps))
+            LabLog.add("TCP: received %.0f MB in %.2f s = %.1f MB/s".format(received / 1024.0 / 1024.0, seconds, mbps))
             onStatus(
                 LabStatus(
                     Phase.CONNECTED,
-                    "recebido ${received / 1024 / 1024} MB",
+                    "received ${received / 1024 / 1024} MB",
                     peer,
                     mbps = mbps,
                     setupMs = setupMs,
@@ -219,7 +219,7 @@ class TcpLink(
         }
     }
 
-    /** Janela grande nos dois sentidos e sem Nagle: o envio vira um fluxo contínuo. */
+    /** Large window in both directions and no Nagle: sending becomes a continuous stream. */
     private fun tune(socket: Socket) {
         runCatching { socket.sendBufferSize = SOCKET_BUFFER }
         runCatching { socket.receiveBufferSize = SOCKET_BUFFER }

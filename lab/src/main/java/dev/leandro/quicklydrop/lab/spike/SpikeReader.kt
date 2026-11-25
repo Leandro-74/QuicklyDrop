@@ -6,9 +6,9 @@ import android.nfc.Tag
 import android.nfc.tech.IsoDep
 
 /**
- * Lado emissor do spike: lê o cartão do receptor e registra o payload.
+ * Spike sender side: reads the receiver's card and records the payload.
  *
- * O AID é escolhido por parâmetro para exercitar os dois cartões (permissivo e
+ * The AID is chosen by parameter to exercise both cards (permissive and
  * `requireDeviceScreenOn`).
  */
 class SpikeReader(private val activity: Activity) {
@@ -32,11 +32,11 @@ class SpikeReader(private val activity: Activity) {
     ) {
         val adapter = nfc
         if (adapter == null) {
-            onError("este aparelho não tem NFC")
+            onError("this device has no NFC")
             return
         }
         if (!adapter.isEnabled) {
-            onError("NFC desligado")
+            onError("NFC turned off")
             return
         }
 
@@ -47,7 +47,7 @@ class SpikeReader(private val activity: Activity) {
 
         runCatching {
             adapter.enableReaderMode(activity, cb, FLAGS, null)
-        }.onFailure { onError("reader mode falhou: ${it.message}") }
+        }.onFailure { onError("reader mode failed: ${it.message}") }
 
         SpikeLog.event(activity, "reader.start", "aid=${aid.toHex()}")
     }
@@ -60,7 +60,7 @@ class SpikeReader(private val activity: Activity) {
     ) {
         val iso = IsoDep.get(tag)
         if (iso == null) {
-            onError("tag sem IsoDep")
+            onError("tag without IsoDep")
             return
         }
 
@@ -70,13 +70,13 @@ class SpikeReader(private val activity: Activity) {
 
             val selected = iso.transceive(select)
             if (selected.size < 2 || selected.last() != 0x00.toByte()) {
-                onError("SELECT recusado")
+                onError("SELECT rejected")
                 return
             }
 
             val response = iso.transceive(GET_DATA)
             if (response.size < 3) {
-                onError("resposta curta")
+                onError("short response")
                 return
             }
 

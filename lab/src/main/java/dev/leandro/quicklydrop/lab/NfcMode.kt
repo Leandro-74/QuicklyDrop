@@ -3,11 +3,11 @@ package dev.leandro.quicklydrop.lab
 import android.app.Activity
 
 /**
- * Identificação por toque: quem recebe apresenta as credenciais do seu hotspot; quem envia
- * lê e entra na rede para empurrar os dados.
+ * Tap-based identification: the receiver presents its hotspot credentials; the sender
+ * reads them and joins the network to push the data.
  *
- * Diferente do BLE, aqui a distância é zero por construção — o Android só entrega o tag
- * quando os dois estão encostados.
+ * Unlike BLE, here the distance is zero by construction — Android only delivers the tag
+ * when both devices are touching.
  */
 class NfcMode(
     activity: Activity,
@@ -26,31 +26,31 @@ class NfcMode(
         if (role == Role.RECEIVER) startReceiver() else startSender()
     }
 
-    // ------------------------------------------------------------- receptor
+    // ------------------------------------------------------------- receiver
 
     private fun startReceiver() {
         link.host { ssid, pass ->
             beam.present("$ssid\n$pass") {
-                onStatus(LabStatus(Phase.CONNECTING, "toque detectado, conectando"))
+                onStatus(LabStatus(Phase.CONNECTING, "tap detected, connecting"))
             }
-            LabLog.add("NFC: credenciais de $ssid publicadas")
-            onStatus(LabStatus(Phase.SEARCHING, "encoste o outro aparelho"))
+            LabLog.add("NFC: credentials for $ssid published")
+            onStatus(LabStatus(Phase.SEARCHING, "touch the other device"))
         }
     }
 
-    // ------------------------------------------------------------- emissor
+    // ------------------------------------------------------------- sender
 
     private fun startSender() {
-        onStatus(LabStatus(Phase.SEARCHING, "encoste no receptor"))
+        onStatus(LabStatus(Phase.SEARCHING, "touch the receiver"))
 
         beam.read(
             onPayload = { payload ->
                 val parts = payload.split("\n")
                 if (parts.size < 2) {
-                    fail("NFC: payload inválido")
+                    fail("NFC: invalid payload")
                     return@read
                 }
-                onStatus(LabStatus(Phase.FOUND, "toque detectado"))
+                onStatus(LabStatus(Phase.FOUND, "tap detected"))
                 link.join(parts[0], parts[1])
             },
             onError = { fail(it) },
@@ -65,6 +65,6 @@ class NfcMode(
     fun stop() {
         beam.stop()
         link.stop()
-        LabLog.add("NFC: parado")
+        LabLog.add("NFC: stopped")
     }
 }

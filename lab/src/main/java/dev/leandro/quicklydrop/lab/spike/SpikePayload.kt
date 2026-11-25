@@ -1,10 +1,10 @@
 package dev.leandro.quicklydrop.lab.spike
 
 /**
- * Payload publicado pelo cartão HCE do spike.
+ * Payload published by the spike HCE card.
  *
- * O payload é texto UTF-8 seguido do status word `9000`. O limite de APDU curta é 255
- * bytes; acima disso o cartão responde `6A82` e o evento é registrado como inválido.
+ * The payload is UTF-8 text followed by the `9000` status word. The short APDU limit is
+ * 255 bytes; above that the card responds `6A82` and the event is recorded as invalid.
  */
 object SpikePayload {
 
@@ -16,15 +16,15 @@ object SpikePayload {
 
     val notFound: ByteArray = byteArrayOf(STATUS_NOT_FOUND_HI.toByte(), STATUS_NOT_FOUND_LO.toByte())
 
-    /** Devolve o motivo de rejeição, ou `null` quando o payload cabe na APDU. */
+    /** Returns the rejection reason, or `null` when the payload fits in the APDU. */
     fun validate(text: String?): String? {
-        if (text.isNullOrBlank()) return "payload vazio"
+        if (text.isNullOrBlank()) return "empty payload"
         val size = text.toByteArray(Charsets.UTF_8).size
-        if (size + 2 > MAX_APDU) return "payload de $size bytes não cabe em APDU curta"
+        if (size + 2 > MAX_APDU) return "payload of $size bytes does not fit in a short APDU"
         return null
     }
 
-    /** Payload + `9000`, ou `6A82` quando não há payload válido. */
+    /** Payload + `9000`, or `6A82` when there is no valid payload. */
     fun response(text: String?): ByteArray {
         if (validate(text) != null) return notFound
         val data = text!!.toByteArray(Charsets.UTF_8)

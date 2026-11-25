@@ -12,7 +12,7 @@ import org.robolectric.annotation.Config
 class P2pConfigTest {
 
     @Test
-    fun `grupo sempre leva ssid e senha`() {
+    fun `group always carries ssid and passphrase`() {
         val config = P2pConfig.group("DIRECT-ED-ABCD", "12345678", 5745)
 
         assertEquals("DIRECT-ED-ABCD", config.networkName)
@@ -21,7 +21,7 @@ class P2pConfigTest {
     }
 
     @Test
-    fun `sem frequencia tambem leva credenciais`() {
+    fun `without frequency it still carries credentials`() {
         val config = P2pConfig.group("DIRECT-ED-ABCD", "12345678")
 
         assertNotNull(config.networkName)

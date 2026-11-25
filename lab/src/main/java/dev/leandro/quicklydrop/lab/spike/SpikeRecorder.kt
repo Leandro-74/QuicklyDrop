@@ -1,6 +1,6 @@
 package dev.leandro.quicklydrop.lab.spike
 
-/** Um evento do spike, com instante monotônico em milissegundos. */
+/** A spike event, with a monotonic instant in milliseconds. */
 data class SpikeEvent(
     val atMs: Long,
     val name: String,
@@ -8,10 +8,10 @@ data class SpikeEvent(
 )
 
 /**
- * Acumula eventos do spike e os formata para logcat/arquivo.
+ * Accumulates spike events and formats them for logcat/file.
  *
- * A classe é pura: o relógio e o [maxEvents] vêm de fora. O primeiro evento vira a
- * referência de tempo, para que as linhas mostrem o deslocamento desde o início.
+ * The class is pure: the clock and [maxEvents] come from outside. The first event becomes
+ * the time reference, so the lines show the offset since the beginning.
  */
 class SpikeRecorder(private val maxEvents: Int = 2_000) {
 
@@ -19,7 +19,7 @@ class SpikeRecorder(private val maxEvents: Int = 2_000) {
     private var baseMs = 0L
     private var hasBase = false
 
-    /** Registra o evento e devolve a linha formatada. */
+    /** Records the event and returns the formatted line. */
     fun record(nowMs: Long, name: String, detail: String = ""): String {
         if (!hasBase) {
             baseMs = nowMs

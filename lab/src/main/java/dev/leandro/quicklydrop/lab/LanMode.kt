@@ -6,11 +6,11 @@ import android.net.nsd.NsdServiceInfo
 import android.os.Build
 
 /**
- * Modo mais simples: os dois já estão na mesma rede Wi-Fi.
- * Descoberta por mDNS, transporte TCP direto. Nenhum diálogo do sistema.
+ * Simplest mode: both devices are already on the same Wi-Fi network.
+ * Discovery over mDNS, direct TCP transport. No system dialogs.
  *
- * A transferência é o mesmo [TcpLink] do P2P e do hotspot: ACK, cancelamento e a mesma
- * medição. Assim os números dos três caminhos são comparáveis.
+ * The transfer is the same [TcpLink] as P2P and hotspot: ACK, cancellation and the same
+ * measurement. That way the numbers from the three paths are comparable.
  */
 class LanMode(
     private val context: Context,
@@ -32,12 +32,12 @@ class LanMode(
     private var finished = false
 
     fun receiver() {
-        onStatus(LabStatus(Phase.SEARCHING, "anunciando na LAN"))
+        onStatus(LabStatus(Phase.SEARCHING, "announcing on LAN"))
         tcp.serve(PORT) { if (!finished) registerService() }
     }
 
     fun sender() {
-        onStatus(LabStatus(Phase.SEARCHING, "procurando na LAN"))
+        onStatus(LabStatus(Phase.SEARCHING, "searching on LAN"))
         discover()
     }
 
@@ -50,11 +50,11 @@ class LanMode(
 
         val listener = object : NsdManager.RegistrationListener {
             override fun onServiceRegistered(info: NsdServiceInfo) {
-                LabLog.add("mDNS: anunciado como ${info.serviceName}")
+                LabLog.add("mDNS: announced as ${info.serviceName}")
             }
 
             override fun onRegistrationFailed(info: NsdServiceInfo, errorCode: Int) {
-                LabLog.add("mDNS: registro falhou ($errorCode)")
+                LabLog.add("mDNS: registration failed ($errorCode)")
             }
 
             override fun onServiceUnregistered(info: NsdServiceInfo) = Unit
@@ -68,13 +68,13 @@ class LanMode(
     private fun discover() {
         val listener = object : NsdManager.DiscoveryListener {
             override fun onDiscoveryStarted(serviceType: String) {
-                LabLog.add("mDNS: busca iniciada")
+                LabLog.add("mDNS: discovery started")
             }
 
             override fun onServiceFound(info: NsdServiceInfo) {
                 if (!info.serviceType.contains("quicklydrop")) return
-                LabLog.add("mDNS: achou ${info.serviceName}")
-                onStatus(LabStatus(Phase.FOUND, "achou ${info.serviceName}"))
+                LabLog.add("mDNS: found ${info.serviceName}")
+                onStatus(LabStatus(Phase.FOUND, "found ${info.serviceName}"))
                 resolve(info)
             }
 
@@ -82,8 +82,8 @@ class LanMode(
             override fun onDiscoveryStopped(serviceType: String) = Unit
 
             override fun onStartDiscoveryFailed(serviceType: String, errorCode: Int) {
-                LabLog.add("mDNS: busca falhou ($errorCode)")
-                onStatus(LabStatus(Phase.ERROR, "mDNS: erro $errorCode"))
+                LabLog.add("mDNS: discovery failed ($errorCode)")
+                onStatus(LabStatus(Phase.ERROR, "mDNS: error $errorCode"))
             }
 
             override fun onStopDiscoveryFailed(serviceType: String, errorCode: Int) = Unit
@@ -96,7 +96,7 @@ class LanMode(
     private fun resolve(info: NsdServiceInfo) {
         val listener = object : NsdManager.ResolveListener {
             override fun onResolveFailed(serviceInfo: NsdServiceInfo, errorCode: Int) {
-                LabLog.add("mDNS: resolve falhou ($errorCode)")
+                LabLog.add("mDNS: resolve failed ($errorCode)")
             }
 
             override fun onServiceResolved(serviceInfo: NsdServiceInfo) {
@@ -109,12 +109,12 @@ class LanMode(
 
                 val host = address?.hostAddress
                 if (host == null) {
-                    LabLog.add("mDNS: resolvido sem endereço")
+                    LabLog.add("mDNS: resolved without address")
                     return
                 }
 
-                LabLog.add("mDNS: ${serviceInfo.serviceName} em $host:${serviceInfo.port}")
-                onStatus(LabStatus(Phase.CONNECTING, "conectando a $host"))
+                LabLog.add("mDNS: ${serviceInfo.serviceName} at $host:${serviceInfo.port}")
+                onStatus(LabStatus(Phase.CONNECTING, "connecting to $host"))
                 tcp.send(host, serviceInfo.port)
             }
         }
@@ -132,6 +132,6 @@ class LanMode(
         discovery = null
 
         tcp.stop()
-        LabLog.add("LAN: parado")
+        LabLog.add("LAN: stopped")
     }
 }

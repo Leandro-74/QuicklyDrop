@@ -4,8 +4,8 @@ import android.nfc.cardemulation.HostApduService
 import android.os.Bundle
 
 /**
- * Cartão emulado do QuicklyDrop. Não é NDEF: é um AID próprio com dois comandos — SELECT e
- * GET DATA — o suficiente para entregar SSID e senha do hotspot em um toque.
+ * QuicklyDrop emulated card. It is not NDEF: it is a custom AID with two commands —
+ * SELECT and GET DATA — enough to deliver the hotspot SSID and passphrase in one tap.
  */
 class QuicklyDropApduService : HostApduService() {
 
@@ -14,11 +14,11 @@ class QuicklyDropApduService : HostApduService() {
         private val NOT_FOUND = byteArrayOf(0x6A.toByte(), 0x82.toByte())
         private val UNKNOWN = byteArrayOf(0x6D.toByte(), 0x00)
 
-        /** Preenchido pelo modo NFC quando o hotspot está de pé. */
+        /** Filled by NFC mode when the hotspot is up. */
         @Volatile
         var payload: ByteArray? = null
 
-        /** Avisa o app que alguém leu o cartão. */
+        /** Notifies the app that someone read the card. */
         @Volatile
         var onRead: (() -> Unit)? = null
     }

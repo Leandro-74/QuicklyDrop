@@ -25,15 +25,15 @@ import java.util.concurrent.Executors
 import kotlin.math.max
 
 /**
- * Exercita o caminho completo do Wi-Fi Aware: attach, publish/subscribe, data path e
- * throughput. É o teste que decide se o QuicklyDrop pode usar NAN como transporte principal.
+ * Exercises the complete Wi-Fi Aware path: attach, publish/subscribe, data path and
+ * throughput. It is the test that decides whether QuicklyDrop can use NAN as its main transport.
  *
- * Fluxo entre dois aparelhos:
- *   1. Ambos tocam "Attach".
- *   2. Um toca "Publish", o outro "Subscribe".
- *   3. O que publicou aparece na lista do que assinou. Ele toca "Conectar".
- *   4. O assinante sobe o servidor, avisa o publicador, e o publicador envia PAYLOAD_BYTES.
- *   5. Os dois lados imprimem o throughput medido.
+ * Flow between two devices:
+ *   1. Both tap "Attach".
+ *   2. One taps "Publish", the other "Subscribe".
+ *   3. The publisher appears in the subscriber's list. It taps "Connect".
+ *   4. The subscriber brings up the server, notifies the publisher, and the publisher sends PAYLOAD_BYTES.
+ *   5. Both sides print the measured throughput.
  */
 class AwareController(
     private val context: Context,
@@ -67,24 +67,24 @@ class AwareController(
 
     fun attach() {
         if (session != null) {
-            log("Aware: já conectado ao serviço")
+            log("Aware: already attached to the service")
             return
         }
         if (attaching) {
-            log("Aware: attach já em andamento")
+            log("Aware: attach already in progress")
             return
         }
         if (manager == null) {
-            log("Aware: serviço indisponível neste aparelho (getSystemService = null)")
+            log("Aware: service unavailable on this device (getSystemService = null)")
             return
         }
         if (!manager.isAvailable) {
-            log("Aware: isAvailable = false — aparelho não suporta NAN ou está desligado")
+            log("Aware: isAvailable = false — device does not support NAN or is turned off")
             return
         }
 
         attaching = true
-        log("Aware: attach iniciado")
+        log("Aware: attach started")
 
         manager.attach(object : AttachCallback() {
             override fun onAttached(awareSession: WifiAwareSession) {
@@ -97,7 +97,7 @@ class AwareController(
 
             override fun onAttachFailed() {
                 attaching = false
-                log("Aware: attach FALHOU (onAttachFailed)")
+                log("Aware: attach FAILED (onAttachFailed)")
                 pendingAction = null
             }
         }, handler)
@@ -117,7 +117,7 @@ class AwareController(
     fun publish() = withSession {
         val awareSession = session ?: return@withSession
         if (publishSession != null) {
-            log("Aware: publish já ativo")
+            log("Aware: publish already active")
             return@withSession
         }
 
@@ -129,12 +129,12 @@ class AwareController(
         awareSession.publish(config, object : DiscoverySessionCallback() {
             override fun onPublishStarted(discoverySession: PublishDiscoverySession) {
                 publishSession = discoverySession
-                log("Aware: publish iniciado como '${deviceLabel()}'")
+                log("Aware: publish started as '${deviceLabel()}'")
             }
 
             override fun onMessageReceived(peerHandle: PeerHandle, message: ByteArray) {
                 val text = String(message)
-                log("Aware: mensagem recebida: $text")
+                log("Aware: message received: $text")
                 if (text == "GO") {
                     peer = peerHandle
                     startClient(peerHandle)
@@ -142,7 +142,7 @@ class AwareController(
             }
 
             override fun onSessionTerminated() {
-                log("Aware: publish encerrado")
+                log("Aware: publish stopped")
                 publishSession = null
             }
         }, handler)
@@ -153,7 +153,7 @@ class AwareController(
     fun subscribe() = withSession {
         val awareSession = session ?: return@withSession
         if (subscribeSession != null) {
-            log("Aware: subscribe já ativo")
+            log("Aware: subscribe already active")
             return@withSession
         }
 
@@ -164,7 +164,7 @@ class AwareController(
         awareSession.subscribe(config, object : DiscoverySessionCallback() {
             override fun onSubscribeStarted(discoverySession: SubscribeDiscoverySession) {
                 subscribeSession = discoverySession
-                log("Aware: subscribe iniciado, procurando '$SERVICE_NAME'")
+                log("Aware: subscribe started, looking for '$SERVICE_NAME'")
             }
 
             override fun onServiceDiscovered(
@@ -173,12 +173,12 @@ class AwareController(
                 matchFilter: List<ByteArray>?,
             ) {
                 peer = peerHandle
-                val name = serviceSpecificInfo?.let { String(it) } ?: "sem nome"
-                log("Aware: peer descoberto ($name) — toque em Conectar")
+                val name = serviceSpecificInfo?.let { String(it) } ?: "no name"
+                log("Aware: peer discovered ($name) — tap Connect")
             }
 
             override fun onSessionTerminated() {
-                log("Aware: subscribe encerrado")
+                log("Aware: subscribe stopped")
                 subscribeSession = null
             }
         }, handler)
@@ -186,12 +186,12 @@ class AwareController(
 
     // --------------------------------------------------------------- connect
 
-    /** Lado assinante: sobe o servidor e avisa o publicador para iniciar o envio. */
+    /** Subscriber side: brings up the server and notifies the publisher to start sending. */
     fun connect() {
         val discovery = subscribeSession
         val peerHandle = peer
         if (discovery == null || peerHandle == null) {
-            log("Aware: conecte depois de descobrir um peer (subscribe + Publish no outro)")
+            log("Aware: connect after discovering a peer (subscribe + Publish on the other device)")
             return
         }
 
@@ -204,33 +204,33 @@ class AwareController(
             .setNetworkSpecifier(specifier)
             .build()
 
-        log("Aware: pedindo data path (servidor)")
+        log("Aware: requesting data path (server)")
 
         val callback = object : ConnectivityManager.NetworkCallback() {
             override fun onAvailable(network: Network) {
-                log("Aware: data path disponível (servidor)")
+                log("Aware: data path available (server)")
                 executor.execute {
                     try {
                         val server = openServerSocket(PORT)
-                        log("Aware: servidor escutando na porta $PORT")
+                        log("Aware: server listening on port $PORT")
                         discovery.sendMessage(peerHandle, 0, "GO".toByteArray())
-                        log("Aware: 'GO' enviado ao publicador")
+                        log("Aware: 'GO' sent to publisher")
                         server.soTimeout = NETWORK_TIMEOUT_MS
                         val socket = server.accept()
-                        log("Aware: cliente conectado de ${socket.inetAddress?.hostAddress}")
+                        log("Aware: client connected from ${socket.inetAddress?.hostAddress}")
                         receiveAndMeasure(socket)
                     } catch (e: Exception) {
-                        log("Aware: erro no servidor — ${e.javaClass.simpleName}: ${e.message}")
+                        log("Aware: server error — ${e.javaClass.simpleName}: ${e.message}")
                     }
                 }
             }
 
             override fun onUnavailable() {
-                log("Aware: data path indisponível (timeout de $NETWORK_TIMEOUT_MS ms)")
+                log("Aware: data path unavailable ($NETWORK_TIMEOUT_MS ms timeout)")
             }
 
             override fun onLost(network: Network) {
-                log("Aware: data path perdido")
+                log("Aware: data path lost")
             }
         }
 
@@ -238,7 +238,7 @@ class AwareController(
         connectivity.requestNetwork(request, callback, NETWORK_TIMEOUT_MS)
     }
 
-    /** Lado publicador: entra na rede e envia o payload. */
+    /** Publisher side: joins the network and sends the payload. */
     private fun startClient(peerHandle: PeerHandle) {
         val discovery = publishSession ?: return
 
@@ -251,31 +251,31 @@ class AwareController(
             .setNetworkSpecifier(specifier)
             .build()
 
-        log("Aware: pedindo data path (cliente)")
+        log("Aware: requesting data path (client)")
 
         val callback = object : ConnectivityManager.NetworkCallback() {
             override fun onAvailable(network: Network) {
-                log("Aware: data path disponível (cliente)")
+                log("Aware: data path available (client)")
                 val info = connectivity.getNetworkCapabilities(network)?.transportInfo as? WifiAwareNetworkInfo
                 val address: InetAddress? = info?.peerIpv6Addr
                 if (address == null) {
-                    log("Aware: peerIpv6Addr nulo — não é possível conectar")
+                    log("Aware: peerIpv6Addr null — cannot connect")
                     return
                 }
                 executor.execute {
                     try {
                         val socket = network.socketFactory.createSocket(address, PORT)
                         socket.soTimeout = NETWORK_TIMEOUT_MS
-                        log("Aware: conectado ao servidor ${address.hostAddress}")
+                        log("Aware: connected to server ${address.hostAddress}")
                         sendAndMeasure(socket)
                     } catch (e: Exception) {
-                        log("Aware: erro no cliente — ${e.javaClass.simpleName}: ${e.message}")
+                        log("Aware: client error — ${e.javaClass.simpleName}: ${e.message}")
                     }
                 }
             }
 
             override fun onUnavailable() {
-                log("Aware: data path indisponível no cliente (timeout)")
+                log("Aware: data path unavailable on client (timeout)")
             }
         }
 
@@ -301,9 +301,9 @@ class AwareController(
 
             val seconds = max(1L, System.nanoTime() - start) / 1_000_000_000.0
             val mbps = (sent / 1024.0 / 1024.0) / seconds
-            log("Aware: enviados ${sent / 1024 / 1024} MB em %.2f s = %.1f MB/s".format(seconds, mbps))
+            log("Aware: sent ${sent / 1024 / 1024} MB in %.2f s = %.1f MB/s".format(seconds, mbps))
         } catch (e: Exception) {
-            log("Aware: falha no envio — ${e.javaClass.simpleName}: ${e.message}")
+            log("Aware: send failed — ${e.javaClass.simpleName}: ${e.message}")
         } finally {
             runCatching { socket.close() }
         }
@@ -324,9 +324,9 @@ class AwareController(
 
             val seconds = max(1L, System.nanoTime() - start) / 1_000_000_000.0
             val mbps = (received / 1024.0 / 1024.0) / seconds
-            log("Aware: recebidos ${received / 1024 / 1024} MB em %.2f s = %.1f MB/s".format(seconds, mbps))
+            log("Aware: received ${received / 1024 / 1024} MB in %.2f s = %.1f MB/s".format(seconds, mbps))
         } catch (e: Exception) {
-            log("Aware: falha no recebimento — ${e.javaClass.simpleName}: ${e.message}")
+            log("Aware: receive failed — ${e.javaClass.simpleName}: ${e.message}")
         } finally {
             runCatching { socket.close() }
         }
@@ -348,13 +348,13 @@ class AwareController(
         peer = null
         pendingAction = null
         attaching = false
-        log("Aware: tudo encerrado")
+        log("Aware: everything stopped")
     }
 
     /**
-     * O Android não expõe ServerSocket preso a uma Network (o SocketFactory não tem
-     * createServerSocket). O data path do Aware é uma interface isolada e protegida por PSK,
-     * então um ServerSocket comum na porta combinada basta para o diagnóstico.
+     * Android does not expose a ServerSocket bound to a Network (SocketFactory has no
+     * createServerSocket). The Aware data path is an isolated interface protected by PSK,
+     * so a plain ServerSocket on the agreed port is enough for the diagnostic.
      */
     private fun openServerSocket(port: Int): ServerSocket = ServerSocket(port)
 

@@ -6,17 +6,17 @@ import org.junit.Test
 class SpikeHexTest {
 
     @Test
-    fun `converte bytes para hex maiusculo`() {
+    fun `converts bytes to uppercase hex`() {
         assertEquals("F0007F", byteArrayOf(0xF0.toByte(), 0x00, 0x7F).toHex())
     }
 
     @Test
-    fun `array vazio vira string vazia`() {
+    fun `empty array becomes empty string`() {
         assertEquals("", ByteArray(0).toHex())
     }
 
     @Test
-    fun `preserva zero a esquerda`() {
+    fun `preserves leading zero`() {
         assertEquals("000A0B", byteArrayOf(0x00, 0x0A, 0x0B).toHex())
     }
 }

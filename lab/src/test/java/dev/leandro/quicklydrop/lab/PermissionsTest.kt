@@ -9,7 +9,7 @@ import org.junit.Test
 class PermissionsTest {
 
     @Test
-    fun `api 35 pede apenas as permissoes nearby`() {
+    fun `api 35 requests only nearby permissions`() {
         val permissions = requiredPermissions(35)
 
         assertFalse(Manifest.permission.ACCESS_FINE_LOCATION in permissions)
@@ -19,7 +19,7 @@ class PermissionsTest {
     }
 
     @Test
-    fun `api 32 ainda pede localizacao e nao pede nearby`() {
+    fun `api 32 still requests location and not nearby`() {
         val permissions = requiredPermissions(32)
 
         assertTrue(Manifest.permission.ACCESS_FINE_LOCATION in permissions)
@@ -29,7 +29,7 @@ class PermissionsTest {
     }
 
     @Test
-    fun `api 29 pede localizacao sem permissoes de bluetooth proximo`() {
+    fun `api 29 requests location without nearby bluetooth permissions`() {
         val permissions = requiredPermissions(Build.VERSION_CODES.Q)
 
         assertTrue(Manifest.permission.ACCESS_FINE_LOCATION in permissions)

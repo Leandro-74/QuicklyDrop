@@ -10,11 +10,11 @@ import androidx.core.content.ContextCompat
 import dev.leandro.quicklydrop.lab.P2pConfig
 
 /**
- * Ações disparadas pelo toque NFC.
+ * Actions triggered by the NFC tap.
  *
- * Cada tentativa é registrada com o resultado ou com a exceção. O objetivo é separar
- * "o Android chamou o HCE" de "o app conseguiu iniciar um serviço em primeiro plano" e
- * de "o app conseguiu criar o grupo P2P", que são permissões diferentes.
+ * Each attempt is recorded with the result or the exception. The goal is to separate
+ * "Android called the HCE" from "the app managed to start a foreground service" and
+ * from "the app managed to create the P2P group", which are different permissions.
  */
 object SpikeActions {
 
@@ -27,17 +27,17 @@ object SpikeActions {
 
     fun startForeground(context: Context, source: String) {
         if (SpikePresence.fgsRunning) {
-            SpikeLog.event(context, "$source.fgs", "já ativo")
+            SpikeLog.event(context, "$source.fgs", "already active")
             return
         }
 
-        SpikeLog.event(context, "$source.fgs", "tentando startForegroundService")
+        SpikeLog.event(context, "$source.fgs", "trying startForegroundService")
         try {
             ContextCompat.startForegroundService(
                 context,
                 Intent(context, SpikeForegroundService::class.java).putExtra("source", source),
             )
-            SpikeLog.event(context, "$source.fgs", "startForegroundService aceito")
+            SpikeLog.event(context, "$source.fgs", "startForegroundService accepted")
         } catch (e: Exception) {
             SpikeLog.event(
                 context,
@@ -50,22 +50,22 @@ object SpikeActions {
     fun createGroup(context: Context, source: String) {
         val manager = context.getSystemService(WifiP2pManager::class.java)
         if (manager == null) {
-            SpikeLog.event(context, "$source.p2p", "Wi-Fi Direct indisponível")
+            SpikeLog.event(context, "$source.p2p", "Wi-Fi Direct unavailable")
             return
         }
 
         val existing = channel
         val local = existing ?: manager.initialize(context, Looper.getMainLooper(), null)
         if (local == null) {
-            SpikeLog.event(context, "$source.p2p", "canal indisponível")
+            SpikeLog.event(context, "$source.p2p", "channel unavailable")
             return
         }
         channel = local
 
-        SpikeLog.event(context, "$source.p2p", "tentando createGroup em $GROUP_FREQUENCY MHz")
+        SpikeLog.event(context, "$source.p2p", "trying createGroup on $GROUP_FREQUENCY MHz")
         val started = SystemClock.uptimeMillis()
 
-        // Um grupo velho sobrevive ao force-stop; remover antes deixa o teste repetível.
+        // An old group survives the force-stop; removing it first keeps the test repeatable.
         try {
             manager.removeGroup(
                 local,
@@ -75,7 +75,7 @@ object SpikeActions {
                 },
             )
         } catch (e: SecurityException) {
-            SpikeLog.event(context, "$source.p2p", "BLOQUEADO (permissão): ${e.message}")
+            SpikeLog.event(context, "$source.p2p", "BLOCKED (permission): ${e.message}")
         }
     }
 
@@ -95,20 +95,20 @@ object SpikeActions {
                         object : WifiP2pManager.ActionListener {
                             override fun onSuccess() {
                                 val elapsed = SystemClock.uptimeMillis() - started
-                                SpikeLog.event(context, "$source.p2p", "grupo criado em ${elapsed}ms")
+                                SpikeLog.event(context, "$source.p2p", "group created in ${elapsed}ms")
                             }
 
                             override fun onFailure(reason: Int) {
                                 SpikeLog.event(
                                     context,
                                     "$source.p2p",
-                                    "falhou: ${SpikeFailure.p2p(reason)}",
+                                    "failed: ${SpikeFailure.p2p(reason)}",
                                 )
                             }
                         },
                     )
                 } catch (e: SecurityException) {
-                    SpikeLog.event(context, "$source.p2p", "BLOQUEADO (permissão): ${e.message}")
+                    SpikeLog.event(context, "$source.p2p", "BLOCKED (permission): ${e.message}")
                 }
             },
             300,

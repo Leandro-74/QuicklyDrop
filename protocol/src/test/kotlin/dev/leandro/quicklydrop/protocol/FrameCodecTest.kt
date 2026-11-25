@@ -32,7 +32,7 @@ class FrameCodecTest {
 
     @Test
     fun `round trip reject`() {
-        val frame = Frame.Reject(RejectReason.NO_SPACE, "sem espaço")
+        val frame = Frame.Reject(RejectReason.NO_SPACE, "no space")
         assertEquals(frame, FrameCodec.decode(FrameCodec.encode(frame)))
     }
 
@@ -62,12 +62,12 @@ class FrameCodecTest {
 
     @Test
     fun `round trip error`() {
-        val frame = Frame.Error(ErrorCode.NO_SPACE, "disco cheio")
+        val frame = Frame.Error(ErrorCode.NO_SPACE, "disk full")
         assertEquals(frame, FrameCodec.decode(FrameCodec.encode(frame)))
     }
 
     @Test
-    fun `writeTo e readFrom preservam a sequencia`() {
+    fun `writeTo and readFrom preserve the sequence`() {
         val output = ByteArrayOutputStream()
         val offer = Frame.Offer(listOf(FileMeta("a.txt", 1, "text/plain")))
         val data = Frame.Data(0, 0, byteArrayOf(1, 2, 3))
@@ -82,14 +82,14 @@ class FrameCodecTest {
     }
 
     @Test
-    fun `rejeita tipo desconhecido`() {
+    fun `rejects an unknown type`() {
         assertThrows(ProtocolException::class.java) {
             FrameCodec.decode(byteArrayOf(0x7F, 0))
         }
     }
 
     @Test
-    fun `rejeita flags reservadas`() {
+    fun `rejects reserved flags`() {
         val bytes = FrameCodec.encode(Frame.Cancel(CancelReason.USER))
         bytes[1] = 1
 
@@ -99,7 +99,7 @@ class FrameCodecTest {
     }
 
     @Test
-    fun `rejeita frame truncado`() {
+    fun `rejects a truncated frame`() {
         val bytes = FrameCodec.encode(Frame.Offer(listOf(FileMeta("a.txt", 1))))
 
         assertThrows(ProtocolException::class.java) {
@@ -108,7 +108,7 @@ class FrameCodecTest {
     }
 
     @Test
-    fun `rejeita bytes extras`() {
+    fun `rejects extra bytes`() {
         val bytes = FrameCodec.encode(Frame.Cancel(CancelReason.USER)) + byteArrayOf(0)
 
         assertThrows(ProtocolException::class.java) {
@@ -117,7 +117,7 @@ class FrameCodecTest {
     }
 
     @Test
-    fun `rejeita utf8 invalido`() {
+    fun `rejects invalid utf8`() {
         val bytes = FrameCodec.encode(Frame.Reject(RejectReason.INVALID, "A"))
         bytes[3] = 0
         bytes[4] = 1
@@ -129,42 +129,42 @@ class FrameCodecTest {
     }
 
     @Test
-    fun `rejeita data acima do limite`() {
+    fun `rejects data above the limit`() {
         assertThrows(ProtocolException::class.java) {
             FrameCodec.encode(Frame.Data(0, 0, ByteArray(FrameCodec.MAX_DATA + 1)))
         }
     }
 
     @Test
-    fun `rejeita data vazio`() {
+    fun `rejects empty data`() {
         assertThrows(ProtocolException::class.java) {
             FrameCodec.encode(Frame.Data(0, 0, ByteArray(0)))
         }
     }
 
     @Test
-    fun `rejeita offer vazio`() {
+    fun `rejects an empty offer`() {
         assertThrows(ProtocolException::class.java) {
             FrameCodec.encode(Frame.Offer(emptyList()))
         }
     }
 
     @Test
-    fun `rejeita nome vazio`() {
+    fun `rejects an empty name`() {
         assertThrows(IllegalArgumentException::class.java) {
             FileMeta("", 1)
         }
     }
 
     @Test
-    fun `rejeita mensagem acima do limite`() {
+    fun `rejects a message above the limit`() {
         assertThrows(ProtocolException::class.java) {
             FrameCodec.encode(Frame.Error(ErrorCode.INTERNAL, "x".repeat(FrameCodec.MAX_MESSAGE + 1)))
         }
     }
 
     @Test
-    fun `rejeita tamanho de frame invalido no stream`() {
+    fun `rejects an invalid frame length in the stream`() {
         val input = ByteArrayInputStream(ByteBuffer.allocate(4).putInt(0).array())
 
         assertThrows(ProtocolException::class.java) {
@@ -173,7 +173,7 @@ class FrameCodecTest {
     }
 
     @Test
-    fun `rejeita stream truncado`() {
+    fun `rejects a truncated stream`() {
         val input = ByteArrayInputStream(ByteBuffer.allocate(4).putInt(10).array() + ByteArray(5))
 
         assertThrows(ProtocolException::class.java) {
@@ -182,7 +182,7 @@ class FrameCodecTest {
     }
 
     @Test
-    fun `data e end comparam conteudo`() {
+    fun `data and end compare content`() {
         val a = Frame.Data(0, 0, byteArrayOf(1, 2, 3))
         val b = Frame.Data(0, 0, byteArrayOf(1, 2, 3))
         val c = Frame.Data(0, 1, byteArrayOf(1, 2, 3))

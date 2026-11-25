@@ -22,17 +22,17 @@ class SpikeManifestTest {
     private val context: Context = RuntimeEnvironment.getApplication()
 
     @Test
-    fun `cartoes hce do spike estao declarados`() {
+    fun `spike hce cards are declared`() {
         val packageManager = context.packageManager
 
         listOf(SpikeApduService::class.java, SpikeScreenOnApduService::class.java).forEach { service ->
             val info = packageManager.getServiceInfo(ComponentName(context, service), 0)
-            assertNotNull("serviço $service ausente", info)
+            assertNotNull("service $service missing", info)
         }
     }
 
     @Test
-    fun `servico em primeiro plano usa connectedDevice`() {
+    fun `foreground service uses connectedDevice`() {
         val info = context.packageManager.getServiceInfo(
             ComponentName(context, SpikeForegroundService::class.java),
             0,
@@ -42,7 +42,7 @@ class SpikeManifestTest {
     }
 
     @Test
-    fun `receiver de transacao nfc esta declarado`() {
+    fun `nfc transaction receiver is declared`() {
         val info = context.packageManager.getReceiverInfo(
             ComponentName(context, SpikeReceiver::class.java),
             PackageManager.GET_META_DATA,
@@ -52,7 +52,7 @@ class SpikeManifestTest {
     }
 
     @Test
-    fun `cartao permissivo nao exige tela ligada`() {
+    fun `permissive card does not require screen on`() {
         val attributes = hceAttributes(R.xml.apduservice_spike)
 
         assertEquals("false", attributes["requireDeviceScreenOn"])
@@ -61,14 +61,14 @@ class SpikeManifestTest {
     }
 
     @Test
-    fun `cartao estrito exige tela ligada`() {
+    fun `strict card requires screen on`() {
         val attributes = hceAttributes(R.xml.apduservice_spike_screen_on)
 
         assertEquals("true", attributes["requireDeviceScreenOn"])
         assertEquals(listOf("F05144524F52"), attributes["aids"])
     }
 
-    /** Lê o XML do HCE e devolve os atributos que importam para o spike. */
+    /** Reads the HCE XML and returns the attributes that matter for the spike. */
     private fun hceAttributes(resource: Int): Map<String, Any> {
         val parser: XmlResourceParser = context.resources.getXml(resource)
         val aids = mutableListOf<String>()
@@ -98,7 +98,7 @@ class SpikeManifestTest {
         }
         parser.close()
 
-        assertTrue("nenhum AID encontrado", aids.isNotEmpty())
+        assertTrue("no AID found", aids.isNotEmpty())
         return mapOf(
             "requireDeviceScreenOn" to (screenOn ?: ""),
             "requireDeviceUnlock" to (unlock ?: ""),

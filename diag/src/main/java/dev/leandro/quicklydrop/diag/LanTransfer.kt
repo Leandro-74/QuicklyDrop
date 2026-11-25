@@ -15,9 +15,9 @@ import java.util.concurrent.Executors
 import kotlin.math.max
 
 /**
- * Mede o throughput real sobre a rede que os aparelhos estiverem compartilhando
- * (LAN comum ou LocalOnlyHotspot). É o número que decide se o transporte serve para
- * arquivos grandes.
+ * Measures the real throughput over the network the devices are sharing
+ * (regular LAN or LocalOnlyHotspot). It is the number that decides whether the transport
+ * works for large files.
  */
 class LanTransfer(
     private val context: Context,
@@ -44,14 +44,14 @@ class LanTransfer(
                 socketServer.soTimeout = 60_000
                 server = socketServer
 
-                log("LAN: servidor na porta $PORT")
-                log("LAN: IPv4 locais — ${localAddresses()}")
+                log("LAN: server on port $PORT")
+                log("LAN: local IPv4 addresses — ${localAddresses()}")
 
                 val socket = socketServer.accept()
-                log("LAN: cliente conectado de ${socket.inetAddress?.hostAddress}")
+                log("LAN: client connected from ${socket.inetAddress?.hostAddress}")
                 receive(socket)
             } catch (e: Exception) {
-                log("LAN: erro no servidor — ${e.javaClass.simpleName}: ${e.message}")
+                log("LAN: server error — ${e.javaClass.simpleName}: ${e.message}")
             }
         }
     }
@@ -64,20 +64,20 @@ class LanTransfer(
                 val socket = Socket()
                 if (network != null) {
                     network.bindSocket(socket)
-                    log("LAN: socket preso à rede ${network}")
+                    log("LAN: socket bound to network ${network}")
                 } else {
-                    log("LAN: nenhuma rede com rota para $host — tentando a padrão")
+                    log("LAN: no network with a route to $host — trying the default")
                 }
                 socket.connect(InetSocketAddress(target, PORT), 10_000)
-                log("LAN: conectado a $host:$PORT")
+                log("LAN: connected to $host:$PORT")
                 sendPayload(socket)
             } catch (e: Exception) {
-                log("LAN: erro no cliente — ${e.javaClass.simpleName}: ${e.message}")
+                log("LAN: client error — ${e.javaClass.simpleName}: ${e.message}")
             }
         }
     }
 
-    /** Acha a rede cuja sub-rede contém o destino. Sem isso o socket sai pela rede padrão. */
+    /** Finds the network whose subnet contains the destination. Without it the socket leaves through the default network. */
     private fun networkFor(target: InetAddress): Network? {
         val cm = context.getSystemService(ConnectivityManager::class.java) ?: return null
         return cm.allNetworks.firstOrNull { network ->
@@ -119,9 +119,9 @@ class LanTransfer(
 
             val seconds = max(1L, System.nanoTime() - start) / 1_000_000_000.0
             val mb = PAYLOAD / 1024.0 / 1024.0
-            log("LAN: enviados %.0f MB em %.2f s = %.1f MB/s".format(mb, seconds, mb / seconds))
+            log("LAN: sent %.0f MB in %.2f s = %.1f MB/s".format(mb, seconds, mb / seconds))
         } catch (e: Exception) {
-            log("LAN: falha no envio — ${e.javaClass.simpleName}: ${e.message}")
+            log("LAN: send failed — ${e.javaClass.simpleName}: ${e.message}")
         } finally {
             runCatching { socket.close() }
         }
@@ -142,9 +142,9 @@ class LanTransfer(
 
             val seconds = max(1L, System.nanoTime() - start) / 1_000_000_000.0
             val mb = received / 1024.0 / 1024.0
-            log("LAN: recebidos %.0f MB em %.2f s = %.1f MB/s".format(mb, seconds, mb / seconds))
+            log("LAN: received %.0f MB in %.2f s = %.1f MB/s".format(mb, seconds, mb / seconds))
         } catch (e: Exception) {
-            log("LAN: falha no recebimento — ${e.javaClass.simpleName}: ${e.message}")
+            log("LAN: receive failed — ${e.javaClass.simpleName}: ${e.message}")
         } finally {
             runCatching { socket.close() }
         }
@@ -160,6 +160,6 @@ class LanTransfer(
                 }
             }
         }
-        if (isEmpty()) append("nenhum")
+        if (isEmpty()) append("none")
     }
 }

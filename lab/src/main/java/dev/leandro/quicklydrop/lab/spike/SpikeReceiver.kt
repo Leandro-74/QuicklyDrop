@@ -6,11 +6,12 @@ import android.content.Intent
 import android.nfc.NfcAdapter
 
 /**
- * Recebe o aviso de transação NFC.
+ * Receives the NFC transaction notice.
  *
- * É a exceção documentada para iniciar um serviço em primeiro plano a partir do
- * background. O spike mede se o broadcast chega quando o app está fechado, se o processo
- * é o mesmo do HCE e se o `startForegroundService` é aceito.
+ * This is the documented exception for starting a foreground service from the
+ * background. The spike measures whether the broadcast arrives when the app is closed,
+ * whether the process is the same as the HCE one, and whether `startForegroundService` is
+ * accepted.
  */
 class SpikeReceiver : BroadcastReceiver() {
 

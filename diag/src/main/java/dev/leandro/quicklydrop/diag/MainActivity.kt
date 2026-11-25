@@ -59,7 +59,7 @@ class MainActivity : ComponentActivity() {
             ActivityResultContracts.RequestMultiplePermissions(),
         ) { result ->
             result.forEach { (permission, granted) ->
-                DiagLog.add("permissão ${permission.substringAfterLast('.')} = $granted")
+                DiagLog.add("permission ${permission.substringAfterLast('.')} = $granted")
             }
         }
 
@@ -72,7 +72,7 @@ class MainActivity : ComponentActivity() {
             launcher.launch(missing.toTypedArray())
         }
 
-        DiagLog.add("=== QuicklyDrop Fase 0 ===")
+        DiagLog.add("=== QuicklyDrop Phase 0 ===")
         Capabilities.collect(this).forEach { cap ->
             DiagLog.add("${if (cap.ok) "[OK]" else "[--]"} ${cap.label}: ${cap.detail}")
         }
@@ -87,12 +87,12 @@ class MainActivity : ComponentActivity() {
     }
 
     /**
-     * Permite dirigir o diagnóstico por adb, sem tocar na tela:
+     * Allows driving the diagnostics over adb, without touching the screen:
      *   adb shell am start -n dev.leandro.quicklydrop.diag/.MainActivity --es action autorun
      */
     private fun handleIntentAction(intent: Intent?) {
         val action = intent?.getStringExtra("action") ?: return
-        DiagLog.add("ação recebida: $action")
+        DiagLog.add("action received: $action")
 
         lifecycleScope.launch {
             if (action.startsWith("send:")) {
@@ -119,7 +119,7 @@ class MainActivity : ComponentActivity() {
                 "join" -> {
                     val ssid = intent.getStringExtra("ssid")
                     val pass = intent.getStringExtra("pass")
-                    if (ssid != null && pass != null) radio.join(ssid, pass) else DiagLog.add("join: faltam ssid/pass")
+                    if (ssid != null && pass != null) radio.join(ssid, pass) else DiagLog.add("join: missing ssid/pass")
                 }
                 "bleadv" -> radio.startBleAdvertise()
                 "bleadv-stop" -> radio.stopBleAdvertise()
@@ -132,7 +132,7 @@ class MainActivity : ComponentActivity() {
                     delay(2_000)
                     aware.subscribe()
                     delay(6_000)
-                    DiagLog.add("autorun: fim")
+                    DiagLog.add("autorun: done")
                 }
             }
         }
@@ -167,9 +167,9 @@ private fun DiagScreen(aware: AwareController) {
                 .fillMaxSize()
                 .padding(16.dp),
         ) {
-            Text("QuicklyDrop · Fase 0", style = MaterialTheme.typography.titleLarge)
+            Text("QuicklyDrop · Phase 0", style = MaterialTheme.typography.titleLarge)
             Text(
-                "Diagnóstico de transporte por proximidade",
+                "Proximity transport diagnostics",
                 style = MaterialTheme.typography.bodySmall,
             )
 
@@ -191,13 +191,13 @@ private fun DiagScreen(aware: AwareController) {
 
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 Button(onClick = { aware.connect() }, modifier = Modifier.weight(1f)) {
-                    Text("Conectar")
+                    Text("Connect")
                 }
                 OutlinedButton(onClick = { aware.stop() }, modifier = Modifier.weight(1f)) {
-                    Text("Parar")
+                    Text("Stop")
                 }
                 OutlinedButton(onClick = { DiagLog.clear() }, modifier = Modifier.weight(1f)) {
-                    Text("Limpar")
+                    Text("Clear")
                 }
             }
 
@@ -206,11 +206,11 @@ private fun DiagScreen(aware: AwareController) {
             OutlinedButton(
                 onClick = {
                     val path = saveReport(context)
-                    DiagLog.add("relatório salvo em $path")
+                    DiagLog.add("report saved to $path")
                 },
                 modifier = Modifier.fillMaxWidth(),
             ) {
-                Text("Salvar relatório")
+                Text("Save report")
             }
 
             Spacer(Modifier.height(12.dp))

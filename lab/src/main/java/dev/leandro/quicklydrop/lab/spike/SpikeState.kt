@@ -1,6 +1,6 @@
 package dev.leandro.quicklydrop.lab.spike
 
-/** Fotografia do estado do processo no instante do evento. */
+/** Snapshot of the process state at the instant of the event. */
 data class SpikeSnapshot(
     val pid: Int,
     val processAgeMs: Long,
@@ -11,7 +11,7 @@ data class SpikeSnapshot(
     val secureNfc: Boolean?,
 )
 
-/** Formatação dos eventos. Separada do Android para poder ser testada em JVM. */
+/** Event formatting. Kept separate from Android so it can be tested on the JVM. */
 object SpikeState {
 
     fun describe(snapshot: SpikeSnapshot): String = buildString {
@@ -31,21 +31,21 @@ object SpikeState {
     }
 }
 
-/** Traduz falhas do Android para uma classificação curta e estável. */
+/** Translates Android failures into a short, stable classification. */
 object SpikeFailure {
 
     fun foregroundService(className: String): String = when {
-        className.contains("ForegroundServiceStartNotAllowed") -> "BLOQUEADO (FGS em background)"
-        className.contains("ForegroundServiceDidNotStartInTime") -> "BLOQUEADO (FGS não iniciou)"
-        className.contains("SecurityException") -> "BLOQUEADO (permissão)"
-        className.contains("IllegalStateException") -> "BLOQUEADO (estado)"
-        else -> "ERRO ($className)"
+        className.contains("ForegroundServiceStartNotAllowed") -> "BLOCKED (FGS in background)"
+        className.contains("ForegroundServiceDidNotStartInTime") -> "BLOCKED (FGS did not start)"
+        className.contains("SecurityException") -> "BLOCKED (permission)"
+        className.contains("IllegalStateException") -> "BLOCKED (state)"
+        else -> "ERROR ($className)"
     }
 
     fun p2p(reason: Int): String = when (reason) {
         0 -> "ERROR"
         1 -> "P2P_UNSUPPORTED"
         2 -> "BUSY"
-        else -> "código $reason"
+        else -> "code $reason"
     }
 }

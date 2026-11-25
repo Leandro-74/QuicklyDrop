@@ -5,10 +5,10 @@ import javax.crypto.BadPaddingException
 import javax.crypto.ShortBufferException
 
 /**
- * Canal cifrado depois do handshake.
+ * Encrypted channel after the handshake.
  *
- * Cada direção tem seu próprio [CipherState] e nonce. O nonce nunca é reutilizado:
- * a biblioteca incrementa a cada mensagem.
+ * Each direction has its own [CipherState] and nonce. The nonce is never reused:
+ * the library increments it for every message.
  */
 class NoiseTransport internal constructor(
     private val sender: CipherState,
@@ -22,24 +22,24 @@ class NoiseTransport internal constructor(
         val length = try {
             sender.encryptWithAd(null, plaintext, 0, out, 0, plaintext.size)
         } catch (e: ShortBufferException) {
-            throw ProtocolException("buffer de cifra insuficiente", e)
+            throw ProtocolException("insufficient cipher buffer", e)
         }
-        if (length != out.size) throw ProtocolException("tamanho de cifra inesperado: $length")
+        if (length != out.size) throw ProtocolException("unexpected ciphertext length: $length")
         return out
     }
 
     fun decrypt(ciphertext: ByteArray): ByteArray {
         val mac = receiver.macLength
-        if (ciphertext.size < mac) throw ProtocolException("ciphertext curto")
+        if (ciphertext.size < mac) throw ProtocolException("short ciphertext")
         val out = ByteArray(ciphertext.size - mac)
         val length = try {
             receiver.decryptWithAd(null, ciphertext, 0, out, 0, ciphertext.size)
         } catch (e: ShortBufferException) {
-            throw ProtocolException("buffer de decifra insuficiente", e)
+            throw ProtocolException("insufficient decryption buffer", e)
         } catch (e: BadPaddingException) {
-            throw ProtocolException("ciphertext inválido", e)
+            throw ProtocolException("invalid ciphertext", e)
         }
-        if (length != out.size) throw ProtocolException("tamanho de plaintext inesperado: $length")
+        if (length != out.size) throw ProtocolException("unexpected plaintext length: $length")
         return out
     }
 

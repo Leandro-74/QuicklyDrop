@@ -6,10 +6,11 @@ import android.util.Log
 import java.io.File
 
 /**
- * Log do spike: logcat (tag `QuicklyDropSpike`) e arquivo em `filesDir/spike.log`.
+ * Spike log: logcat (tag `QuicklyDropSpike`) and a file at `filesDir/spike.log`.
  *
- * O arquivo importa porque o processo pode ser morto entre o toque e a coleta; `adb
- * logcat -d` perde o buffer em alguns cenários. O formato é o mesmo nos dois destinos.
+ * The file matters because the process may be killed between the tap and the collection;
+ * `adb logcat -d` loses the buffer in some scenarios. The format is the same in both
+ * destinations.
  */
 object SpikeLog {
 
@@ -32,7 +33,7 @@ object SpikeLog {
 
     fun lines(): List<String> = synchronized(lock) { recorder.lines() }
 
-    /** Repete o log no logcat, para coleta por `adb logcat -d -s QuicklyDropSpike`. */
+    /** Repeats the log in logcat, for collection with `adb logcat -d -s QuicklyDropSpike`. */
     fun dump() {
         lines().forEach { Log.i(TAG, it) }
     }
@@ -42,14 +43,14 @@ object SpikeLog {
             recorder.clear()
             if (context != null) runCatching { file(context).delete() }
         }
-        Log.i(TAG, "log limpo")
+        Log.i(TAG, "log cleared")
     }
 
     private fun append(context: Context, line: String) {
         runCatching {
             val file = file(context)
             if (file.length() > MAX_FILE_BYTES) {
-                file.writeText("--- log truncado ---\n")
+                file.writeText("--- log truncated ---\n")
             }
             file.appendText(line + "\n")
         }

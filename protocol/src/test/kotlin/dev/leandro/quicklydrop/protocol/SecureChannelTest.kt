@@ -32,7 +32,7 @@ class SecureChannelTest {
         SecureChannel(ByteArrayInputStream(wire), ByteArrayOutputStream(), transport)
 
     @Test
-    fun `envia e recebe offer`() {
+    fun `sends and receives an offer`() {
         val pair = handshake()
         val wire = ByteArrayOutputStream()
         val frame = Frame.Offer(listOf(FileMeta("a.txt", 10, "text/plain")))
@@ -43,7 +43,7 @@ class SecureChannelTest {
     }
 
     @Test
-    fun `envia e recebe data`() {
+    fun `sends and receives data`() {
         val pair = handshake()
         val wire = ByteArrayOutputStream()
         val frame = Frame.Data(0, 0, ByteArray(1024) { it.toByte() })
@@ -54,7 +54,7 @@ class SecureChannelTest {
     }
 
     @Test
-    fun `envia varios frames em sequencia`() {
+    fun `sends several frames in sequence`() {
         val pair = handshake()
         val wire = ByteArrayOutputStream()
         val frames = listOf(
@@ -74,7 +74,7 @@ class SecureChannelTest {
     }
 
     @Test
-    fun `rejeita ciphertext adulterado`() {
+    fun `rejects tampered ciphertext`() {
         val pair = handshake()
         val wire = ByteArrayOutputStream()
         sender(wire, pair.initiatorTransport).send(Frame.Cancel(CancelReason.USER))
@@ -88,7 +88,7 @@ class SecureChannelTest {
     }
 
     @Test
-    fun `rejeita prefixo de tamanho invalido`() {
+    fun `rejects an invalid length prefix`() {
         val pair = handshake()
         val bytes = ByteBuffer.allocate(4).putInt(0).array()
 
@@ -98,7 +98,7 @@ class SecureChannelTest {
     }
 
     @Test
-    fun `rejeita ciphertext acima do limite`() {
+    fun `rejects ciphertext above the limit`() {
         val pair = handshake()
         val bytes = ByteBuffer.allocate(4).putInt(SecureChannel.MAX_CIPHERTEXT + 1).array()
 
@@ -108,14 +108,14 @@ class SecureChannelTest {
     }
 
     @Test
-    fun `retorna null no fim do stream`() {
+    fun `returns null at end of stream`() {
         val pair = handshake()
 
         assertNull(receiver(ByteArray(0), pair.responderTransport).receive())
     }
 
     @Test
-    fun `rejeita stream truncado`() {
+    fun `rejects a truncated stream`() {
         val pair = handshake()
         val bytes = ByteBuffer.allocate(4).putInt(10).array() + ByteArray(5)
 

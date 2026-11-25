@@ -25,7 +25,7 @@ class SpikeStateTest {
     )
 
     @Test
-    fun `descreve processo atividade e tela`() {
+    fun `describes process activity and screen`() {
         val text = SpikeState.describe(snapshot())
 
         assertTrue(text.contains("pid=123"))
@@ -38,7 +38,7 @@ class SpikeStateTest {
     }
 
     @Test
-    fun `descreve tela apagada travada e fgs ativo`() {
+    fun `describes screen off locked and fgs active`() {
         val text = SpikeState.describe(
             snapshot(
                 activityVisible = true,
@@ -57,31 +57,31 @@ class SpikeStateTest {
     }
 
     @Test
-    fun `classifica bloqueio de fgs em background`() {
+    fun `classifies fgs blocked in background`() {
         val result = SpikeFailure.foregroundService(
             "android.app.ForegroundServiceStartNotAllowedException",
         )
 
-        assertEquals("BLOQUEADO (FGS em background)", result)
+        assertEquals("BLOCKED (FGS in background)", result)
     }
 
     @Test
-    fun `classifica falha de permissao e erro generico`() {
+    fun `classifies permission failure and generic error`() {
         assertTrue(
             SpikeFailure.foregroundService("java.lang.SecurityException")
-                .startsWith("BLOQUEADO"),
+                .startsWith("BLOCKED"),
         )
         assertTrue(
             SpikeFailure.foregroundService("java.lang.RuntimeException")
-                .startsWith("ERRO"),
+                .startsWith("ERROR"),
         )
     }
 
     @Test
-    fun `traduz motivos do wifi direct`() {
+    fun `translates wifi direct reasons`() {
         assertEquals("P2P_UNSUPPORTED", SpikeFailure.p2p(1))
         assertEquals("BUSY", SpikeFailure.p2p(2))
         assertEquals("ERROR", SpikeFailure.p2p(0))
-        assertEquals("código 7", SpikeFailure.p2p(7))
+        assertEquals("code 7", SpikeFailure.p2p(7))
     }
 }

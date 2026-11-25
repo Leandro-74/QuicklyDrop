@@ -7,9 +7,9 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 
 /**
- * Liga a UI aos modos de teste. Cada `start` cria instâncias novas, para que nenhum
- * estado sujo de um teste anterior vaze para o seguinte — no laboratório, repetir o
- * mesmo teste limpo vale mais do que reaproveitar objeto.
+ * Connects the UI to the test modes. Each `start` creates fresh instances, so no dirty
+ * state from a previous test leaks into the next one — in the lab, repeating the same
+ * clean test is worth more than reusing an object.
  */
 class LabController(private val activity: Activity) {
 
@@ -28,7 +28,7 @@ class LabController(private val activity: Activity) {
         LabLog.add("--- ${mode.label} / ${role.label} ---")
         _status.value = LabStatus(
             phase = Phase.SEARCHING,
-            detail = "iniciando ${mode.label}",
+            detail = "starting ${mode.label}",
             mode = mode,
             role = role,
         )
@@ -50,7 +50,7 @@ class LabController(private val activity: Activity) {
                 direct = it
                 it.start()
             }
-            else -> fail("${mode.label}: ainda não implementado")
+            else -> fail("${mode.label}: not implemented yet")
         }
     }
 
@@ -64,14 +64,14 @@ class LabController(private val activity: Activity) {
         val hadDirect = direct != null
         direct?.stop()
         direct = null
-        // Se o app foi reiniciado, o modo P2P não está mais em memória, mas o grupo
-        // pode ter ficado no framework. Nesse caso, limpa na hora de parar.
+        // If the app was restarted, the P2P mode is no longer in memory, but the group
+        // may have been left in the framework. In that case, clean it up when stopping.
         if (!quiet && !hadDirect) P2pCleanup.remove(activity)
         _status.value = LabStatus(
             mode = _status.value.mode,
             role = _status.value.role,
         )
-        if (!quiet) LabLog.add("parado")
+        if (!quiet) LabLog.add("stopped")
     }
 
     fun selectMode(mode: Mode) {
@@ -82,7 +82,7 @@ class LabController(private val activity: Activity) {
         _status.value = _status.value.choose(role = role)
     }
 
-    /** Os modos reportam só fase/detalhe; modo e papel são do controlador. */
+    /** Modes report only phase/detail; mode and role belong to the controller. */
     private fun report(status: LabStatus) {
         _status.value = status.copy(
             mode = _status.value.mode,

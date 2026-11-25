@@ -7,7 +7,7 @@ import android.os.PowerManager
 import android.os.Process
 import android.os.SystemClock
 
-/** Estado observável do processo e do aparelho no momento do evento. */
+/** Observable state of the process and the device at the moment of the event. */
 object SpikePresence {
 
     @Volatile
