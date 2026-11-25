@@ -4,6 +4,31 @@ plugins {
     id("org.jetbrains.kotlin.plugin.compose")
 }
 
+fun localEnv(): Map<String, String> {
+    val file = rootProject.file(".env")
+    if (!file.exists()) return emptyMap()
+    return file.readLines()
+        .map { it.trim().removePrefix("export ").trim() }
+        .filter { it.isNotEmpty() && !it.startsWith("#") && it.contains("=") }
+        .associate { line ->
+            line.substringBefore("=").trim() to line.substringAfter("=").trim()
+        }
+}
+
+fun envValue(name: String): String? =
+    System.getenv(name)?.takeIf { it.isNotBlank() } ?: localEnv()[name]?.takeIf { it.isNotBlank() }
+
+val releaseKeystore = envValue("QUICKLYDROP_KEYSTORE")
+val releaseStorePassword = envValue("QUICKLYDROP_KEYSTORE_PASSWORD")
+val releaseKeyAlias = envValue("QUICKLYDROP_KEY_ALIAS")
+val releaseKeyPassword = envValue("QUICKLYDROP_KEY_PASSWORD")
+val hasReleaseSigning = listOf(
+    releaseKeystore,
+    releaseStorePassword,
+    releaseKeyAlias,
+    releaseKeyPassword,
+).all { it != null }
+
 android {
     namespace = "dev.leandro.quicklydrop"
     compileSdk = 35
@@ -16,9 +41,23 @@ android {
         versionName = "0.1.0-alpha01"
     }
 
+    signingConfigs {
+        if (hasReleaseSigning) {
+            create("release") {
+                storeFile = rootProject.file(releaseKeystore!!)
+                storePassword = releaseStorePassword
+                keyAlias = releaseKeyAlias
+                keyPassword = releaseKeyPassword
+            }
+        }
+    }
+
     buildTypes {
         release {
             isMinifyEnabled = false
+            if (hasReleaseSigning) {
+                signingConfig = signingConfigs.getByName("release")
+            }
         }
     }
 
