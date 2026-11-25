@@ -1,6 +1,6 @@
-# Protocolo EasyDrop v1
+# Protocolo QuicklyDrop v1
 
-> Status: especificação da Fase 1. Identificador de fio: `easydrop/1`.
+> Status: especificação da Fase 1. Identificador de fio: `quicklydrop/1`.
 > O identificador de fio é estável e não muda com o nome comercial do aplicativo.
 
 ## 1. Escopo
@@ -73,7 +73,7 @@ Para o MVP, `flags = 0b00001101` (P2P + credenciais + chave).
 ## 4. Handshake (Noise)
 
 - Protocolo: `Noise_NK_25519_ChaChaPoly_SHA256`.
-- Prólogo: `easydrop/1` (ASCII, sem NUL).
+- Prólogo: `quicklydrop/1` (ASCII, sem NUL).
 - O emissor é o **iniciador**; o receptor é o **respondente**.
 - O receptor gera um par de chaves X25519 **por janela de recebimento** e publica a chave
   pública no payload NFC.
@@ -251,7 +251,7 @@ nem as credenciais. O usuário pode cancelar pela notificação.
 
 ## 8. Compatibilidade
 
-- O receptor aceita apenas a mesma versão maior (`easydrop/1`).
+- O receptor aceita apenas a mesma versão maior (`quicklydrop/1`).
 - O prólogo do Noise já vincula a versão: versões diferentes falham no handshake com
   mensagem clara, sem tentar interpretar bytes desconhecidos.
 - Campos novos devem ser adicionados em uma versão nova, não como sufixo ignorado.

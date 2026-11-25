@@ -1,4 +1,4 @@
-# EasyDrop
+# QuicklyDrop
 
 Compartilhamento de arquivos por proximidade entre dispositivos Android. A transferência
 ocorre inteiramente entre os dois aparelhos: sem conta, sem nuvem, sem servidor.
@@ -79,11 +79,11 @@ conectando, verde conectado, verde escuro transferindo, vermelho erro. Cada exec
 16 MB e reporta setup e MB/s.
 
 ```bash
-PKG=dev.leandro.easydrop.lab
+PKG=dev.leandro.quicklydrop.lab
 adb shell am start -n $PKG/.MainActivity --es action start --es mode P2P --es role SENDER
 adb shell am start -n $PKG/.MainActivity --es action start --es mode P2P --es role RECEIVER
 adb shell am start -n $PKG/.MainActivity --es action stop
-adb logcat -s EasyDropLab:I
+adb logcat -s QuicklyDropLab:I
 ```
 
 Modos: `LAN` (mDNS + TCP), `BLE` (BLE + GATT + hotspot), `NFC` (toque + hotspot) e `P2P`
@@ -117,7 +117,7 @@ adb install -r app/build/outputs/apk/debug/app-debug.apk
 Ações disparáveis por adb:
 
 ```bash
-PKG=dev.leandro.easydrop.diag
+PKG=dev.leandro.quicklydrop.diag
 
 # capacidades do aparelho (Wi-Fi Aware, Direct, NFC, BLE, UWB)
 adb shell am start -n $PKG/.MainActivity
@@ -137,7 +137,7 @@ adb shell am start -n $PKG/.MainActivity --es action serve
 adb shell am start -n $PKG/.MainActivity --es action send:192.168.0.10
 
 # acompanhar
-adb logcat -s EasyDropDiag:I
+adb logcat -s QuicklyDropDiag:I
 ```
 
 ## Roadmap

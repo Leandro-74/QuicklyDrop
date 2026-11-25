@@ -19,13 +19,13 @@
 
 | Componente | Papel |
 |---|---|
-| `SpikeApduService` | HCE permissivo, AID `F04544524F51`, `requireDeviceScreenOn="false"` |
-| `SpikeScreenOnApduService` | HCE estrito, AID `F04544524F52`, `requireDeviceScreenOn="true"` |
+| `SpikeApduService` | HCE permissivo, AID `F05144524F51`, `requireDeviceScreenOn="false"` |
+| `SpikeScreenOnApduService` | HCE estrito, AID `F05144524F52`, `requireDeviceScreenOn="true"` |
 | `SpikeForegroundService` | FGS mínimo, tipo `connectedDevice`, notificação de teste |
 | `SpikeReceiver` | Receiver de `android.nfc.action.TRANSACTION_DETECTED` |
 | `SpikeReader` | Reader mode no emissor, escolhe o AID permissivo ou estrito |
 | `SpikeStore` | Persiste payload e opções para sobreviver à morte do processo |
-| `SpikeLog` | Logcat (tag `EasyDropSpike`) + `filesDir/spike.log` |
+| `SpikeLog` | Logcat (tag `QuicklyDropSpike`) + `filesDir/spike.log` |
 | `SpikePresence` | PID, idade do processo, atividade visível, FGS, tela, keyguard, Secure NFC |
 
 O payload do spike é texto de teste. As chaves reais continuam só na memória; o spike
@@ -42,21 +42,21 @@ adb -s <serial> install -r lab/build/outputs/apk/debug/lab-debug.apk
 Armar o receptor:
 
 ```bash
-adb -s <serial> shell am start -n dev.leandro.easydrop.lab/.MainActivity \
+adb -s <serial> shell am start -n dev.leandro.quicklydrop.lab/.MainActivity \
   --es action spike-arm --es payload "SPIKE-RECV-1" --ez fgs true --ez group true
 ```
 
 Ler no emissor (AID permissivo):
 
 ```bash
-adb -s <serial> shell am start -n dev.leandro.easydrop.lab/.MainActivity \
+adb -s <serial> shell am start -n dev.leandro.quicklydrop.lab/.MainActivity \
   --es action spike-read --ez screenOn false
 ```
 
 Ler no emissor (AID estrito):
 
 ```bash
-adb -s <serial> shell am start -n dev.leandro.easydrop.lab/.MainActivity \
+adb -s <serial> shell am start -n dev.leandro.quicklydrop.lab/.MainActivity \
   --es action spike-read --ez screenOn true
 ```
 
@@ -64,26 +64,26 @@ Comandos auxiliares:
 
 ```bash
 # estado do processo e do aparelho
-adb -s <serial> shell am start -n dev.leandro.easydrop.lab/.MainActivity --es action spike-info
+adb -s <serial> shell am start -n dev.leandro.quicklydrop.lab/.MainActivity --es action spike-info
 
 # baseline: FGS a partir da atividade em foreground
-adb -s <serial> shell am start -n dev.leandro.easydrop.lab/.MainActivity --es action spike-fgs
+adb -s <serial> shell am start -n dev.leandro.quicklydrop.lab/.MainActivity --es action spike-fgs
 
 # baseline: grupo P2P a partir da atividade
-adb -s <serial> shell am start -n dev.leandro.easydrop.lab/.MainActivity --es action spike-group
+adb -s <serial> shell am start -n dev.leandro.quicklydrop.lab/.MainActivity --es action spike-group
 
 # limpar log
-adb -s <serial> shell am start -n dev.leandro.easydrop.lab/.MainActivity --es action spike-reset
+adb -s <serial> shell am start -n dev.leandro.quicklydrop.lab/.MainActivity --es action spike-reset
 
 # desarmar
-adb -s <serial> shell am start -n dev.leandro.easydrop.lab/.MainActivity --es action spike-disarm
+adb -s <serial> shell am start -n dev.leandro.quicklydrop.lab/.MainActivity --es action spike-disarm
 ```
 
 Coleta:
 
 ```bash
-adb -s <serial> logcat -d -s EasyDropSpike
-adb -s <serial> shell run-as dev.leandro.easydrop.lab cat files/spike.log
+adb -s <serial> logcat -d -s QuicklyDropSpike
+adb -s <serial> shell run-as dev.leandro.quicklydrop.lab cat files/spike.log
 ```
 
 Eventos esperados no log:
@@ -131,17 +131,17 @@ outra.
 
 ```bash
 # foreground: abrir a atividade
-adb -s <serial> shell am start -n dev.leandro.easydrop.lab/.MainActivity
+adb -s <serial> shell am start -n dev.leandro.quicklydrop.lab/.MainActivity
 
 # background: voltar para a home
 adb -s <serial> shell input keyevent KEYCODE_HOME
 
 # processo morto: mata processos em background (não é o mesmo que remover dos recentes,
 # mas produz o mesmo efeito de processo recriado)
-adb -s <serial> shell am kill dev.leandro.easydrop.lab
+adb -s <serial> shell am kill dev.leandro.quicklydrop.lab
 
 # force-stop: desabilita o app e o HCE até o app ser aberto de novo
-adb -s <serial> shell am force-stop dev.leandro.easydrop.lab
+adb -s <serial> shell am force-stop dev.leandro.quicklydrop.lab
 
 # tela apagada / ligada
 adb -s <serial> shell input keyevent KEYCODE_POWER

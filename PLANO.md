@@ -1,4 +1,4 @@
-# EasyDrop — Plano Técnico
+# QuicklyDrop — Plano Técnico
 
 > Documento de planejamento e registro de medições. O laboratório de protocolos (`:lab`) já
 > está implementado e validado nos dois aparelhos de teste; o app de produto ainda não existe.
@@ -7,8 +7,8 @@
 
 ## 1. Resumo executivo
 
-O EasyDrop é um app de compartilhamento de arquivos por proximidade para Android. O objetivo
-funcional mínimo é a transferência **EasyDrop ↔ EasyDrop**, validada em um par de aparelhos de
+O QuicklyDrop é um app de compartilhamento de arquivos por proximidade para Android. O objetivo
+funcional mínimo é a transferência **QuicklyDrop ↔ QuicklyDrop**, validada em um par de aparelhos de
 teste.
 
 Interoperabilidade com o Quick Drop da Motorola: o Quick Drop é uma camada de marca da Motorola
@@ -27,7 +27,7 @@ hardware; Apple fica fora do escopo.**
 Decisões já fechadas:
 
 - **Escopo:** Android apenas. Sem iOS, sem macOS, sem AirDrop.
-- **Fase 1:** só EasyDrop ↔ EasyDrop.
+- **Fase 1:** só QuicklyDrop ↔ QuicklyDrop.
 - **Licença:** GPL-3.0.
 
 ---
@@ -113,7 +113,7 @@ Uso recomendado: **spike de benchmark**, não fundação do produto.
 
 | # | Opção | Esforço | Risco | Entrega |
 |---|---|---|---|---|
-| A | Protocolo próprio, EasyDrop ↔ EasyDrop | Médio | Baixo | Diferencial completo, controle total |
+| A | Protocolo próprio, QuicklyDrop ↔ QuicklyDrop | Médio | Baixo | Diferencial completo, controle total |
 | B | A + interop Quick Share/Quick Drop | Alto | Médio | Fala com qualquer Android sem o app |
 | C | Interop AirDrop/iPhone | — | — | **Fora de escopo** (decisão de produto + bloqueio de hardware) |
 | D | Só Nearby Connections | Baixo | Baixo | Funciona, mas genérico e dependente de GMS |
@@ -160,7 +160,7 @@ core/proximity/          RSSI BLE (+ UWB quando houver) → "quão perto" → ga
    LocalOnlyHotspot e o emissor entra via `WifiNetworkSpecifier`. Se os dois já estiverem na
    mesma LAN, abre TCP nela.
 6. **Transferência:** frames de 1 MiB, SHA-256 por arquivo, ACK por janela, retomada por offset.
-7. **Fim:** grava em `Downloads/EasyDrop/` via MediaStore, notifica, apaga buffers.
+7. **Fim:** grava em `Downloads/QuicklyDrop/` via MediaStore, notifica, apaga buffers.
 
 ### 5.4 Segurança
 
@@ -259,7 +259,7 @@ Conclusões:
 - O hotspot do Edge convive com o Wi-Fi normal (`wlan1` continua conectado enquanto o
   `wlan2` serve o AP) — o risco de derrubar a internet não se confirmou nesse aparelho.
 
-### Fase 1 — MVP EasyDrop ↔ EasyDrop (3–4 semanas)
+### Fase 1 — MVP QuicklyDrop ↔ QuicklyDrop (3–4 semanas)
 
 - Descoberta NFC (toque) com BLE como alternativa; conexão por Wi-Fi Direct; fallback
   LocalOnlyHotspot ou LAN comum.
@@ -280,7 +280,7 @@ Só depois de a Fase 1 estar sólida.
 
 - Validar em black-box: Bada/NearDrop/Packet conseguem enviar para o Edge 50 Ultra?
 - Se sim: portar/reusar a camada de protocolo (NearDrop é Unlicense — a mais amigável).
-- Implementar UKEY2 + protobuf + mDNS/BLE do Quick Share no stack do EasyDrop.
+- Implementar UKEY2 + protobuf + mDNS/BLE do Quick Share no stack do QuicklyDrop.
 - **Não** redistribuir nada da Motorola ou do Google. Código próprio ou OSS compatível.
 
 ### Fora de escopo — Apple
@@ -340,13 +340,13 @@ consumo de bateria por transferência.
 **Fechadas:**
 
 1. Escopo: **Android apenas**, sem Apple.
-2. Fase 1: **só EasyDrop ↔ EasyDrop**.
+2. Fase 1: **só QuicklyDrop ↔ QuicklyDrop**.
 3. Licença: **GPL-3.0**.
 4. Repositório e laboratório já criados; o `:lab` é a base de código validada.
 
 **Pendentes (antes do app de produto):**
 
-1. **Application ID** — `dev.leandro.easydrop` (o lab usa `.lab` e o diagnóstico usa `.diag`).
+1. **Application ID** — `dev.leandro.quicklydrop` (o lab usa `.lab` e o diagnóstico usa `.diag`).
 2. **Identidade visual** — nome do app já está fechado; falta ícone e paleta.
 3. **Camada de produto** — share sheet, MediaStore, progresso, hash e foreground service.
 4. **Criptografia** — handshake X25519 + HKDF + AEAD antes de qualquer uso fora do laboratório.

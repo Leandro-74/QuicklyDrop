@@ -1,4 +1,4 @@
-# EasyDrop — Análise e propostas de evolução
+# QuicklyDrop — Análise e propostas de evolução
 
 > **01/11/2026 · documento de análise e registro.** A primeira rodada de correções e
 > experimentos foi executada nos dois aparelhos. O que foi aceito, o que foi rejeitado e o
@@ -182,7 +182,7 @@ mesmo "TCP: conectado em Xms" do log.
 
 #### C5. LAN e P2P medem coisas diferentes — **aplicado**
 
-**Onde:** `LanMode.kt` vs `TcpLink.kt`; `app/src/main/java/dev/leandro/easydrop/diag/LanTransfer.kt`
+**Onde:** `LanMode.kt` vs `TcpLink.kt`; `app/src/main/java/dev/leandro/quicklydrop/diag/LanTransfer.kt`
 é uma terceira cópia.
 
 **Problema:** `LanMode` não tem ACK, usa buffers padrão, tem um `Thread.sleep(500)` e calcula o
@@ -325,7 +325,7 @@ números e link para este arquivo. É barato e evita decisões baseadas em dados
 | C17 | `BleMode` | escolhe o primeiro anúncio acima do limiar, não o mais forte | janela de 1–2 s + escolher o maior RSSI |
 | C18 | `LanMode` | `resolveService` concorrente pode dar `FAILURE_ALREADY_ACTIVE` (o timeout de conexão já foi resolvido pelo `TcpLink`) | serializar resolves com retry |
 | C19 | `NfcBeam.present` | não confere se o NFC continua ligado; falha silenciosa | checar `nfc.isEnabled` e reportar |
-| C20 | `EasyDropApduService` | resposta HCE curta limita o payload a ~255 bytes; sem chunking | definir limite e, se crescer, usar APDU estendida/chunking |
+| C20 | `QuicklyDropApduService` | resposta HCE curta limita o payload a ~255 bytes; sem chunking | definir limite e, se crescer, usar APDU estendida/chunking |
 | C21 | `NfcMode`/`WifiDirectMode`/`BleMode` | payload delimitado por `\n`; SSID/nome com newline quebra o parsing | codec binário/TLV com tamanho por campo (ver §4) |
 | C22 | `LabLog` | cada linha copia a lista inteira (`it + line`); em rajada, aloca muito | `ArrayDeque` + snapshot ou lote de linhas |
 | C23 | `P2pConfigTest` | o teste de frequência funciona porque a API 35 grava a frequência em `groupOwnerBand`; é frágil | manter, mas adicionar um teste de `toString`/reflexão e revisar ao subir o SDK |
@@ -418,7 +418,7 @@ adb shell cmd wifi status
 adb shell dumpsys wifip2p | grep -i -E "frequency|group|channel"
 adb shell dumpsys wifi | grep -i -E "mPowerSaveDisableRequests|WifiLock"
 adb shell dumpsys thermalservice | grep -i -E "status|temperature"
-adb shell dumpsys batterystats --charged | grep -i easydrop
+adb shell dumpsys batterystats --charged | grep -i quicklydrop
 ```
 
 ### 5.2 Tabela de experimentos
@@ -495,7 +495,7 @@ com GPL-3.0).
    todas as decisões seguintes.
 2. **Protocolo + codec + testes** (`:core:protocol`). Payload versionado, framing, manifesto,
    hash. Sem UI.
-3. **MVP de arquivo real.** Share sheet → P2P → `MediaStore/Downloads/EasyDrop`, progresso,
+3. **MVP de arquivo real.** Share sheet → P2P → `MediaStore/Downloads/QuicklyDrop`, progresso,
    cancelamento, hash, nome duplicado. Primeiro marco que um humano consegue usar.
 4. **Criptografia + SAS.** Handshake, chave de sessão, confirmação; NFC como prova de presença.
 5. **Foreground service + background.** Receber com tela apagada; notificação; cancelar;
@@ -512,7 +512,7 @@ com GPL-3.0).
 - compartilhar 1..N arquivos pelo share sheet do Android;
 - receber via P2P (receptor hospeda), com o toque NFC como gatilho;
 - progresso, cancelar, erro claro;
-- gravar em `Downloads/EasyDrop/` via MediaStore, com `.part` e rename no fim;
+- gravar em `Downloads/QuicklyDrop/` via MediaStore, com `.part` e rename no fim;
 - SHA-256 por arquivo e verificação no receptor;
 - tela de recebimento com "Aceitar/Recusar" (a confirmação explícita continua obrigatória).
 
@@ -589,7 +589,7 @@ com GPL-3.0).
 - **Receber sem abrir o app.** Tile de configurações rápidas + foreground service + HCE; o
   usuário só encosta e o card aparece.
 - **Share sheet direto.** `ACTION_SEND`/`ACTION_SEND_MULTIPLE` com `ClipData` e permissões
-  temporárias; o EasyDrop aparece como destino sem abrir o app.
+  temporárias; o QuicklyDrop aparece como destino sem abrir o app.
 - **Um para muitos.** O grupo P2P aceita mais de um cliente; testar 1 emissor → 2 receptores,
   com taxa por receptor.
 - **Retomada de verdade.** Manifesto + offset persistido; se o app morrer, continua do ponto
@@ -646,16 +646,16 @@ Manter os rejeitados documentados (como o grupo em 2,4 GHz) evita repetir a mesm
 
 ## 10. Arquivos de referência
 
-- `lab/src/main/java/dev/leandro/easydrop/lab/HotspotLink.kt` — `WifiLock`, hotspot, WNS.
-- `lab/src/main/java/dev/leandro/easydrop/lab/TcpLink.kt` — transferência, ACK, buffers.
-- `lab/src/main/java/dev/leandro/easydrop/lab/LanMode.kt` — mDNS + TCP (caminho separado).
-- `lab/src/main/java/dev/leandro/easydrop/lab/WifiDirectMode.kt` — grupo, NFC, descoberta.
-- `lab/src/main/java/dev/leandro/easydrop/lab/P2pConfig.kt` — SSID/senha/frequência.
-- `lab/src/main/java/dev/leandro/easydrop/lab/P2pCleanup.kt` — grupo velho.
-- `lab/src/main/java/dev/leandro/easydrop/lab/BleMode.kt` — BLE + GATT + hotspot.
-- `lab/src/main/java/dev/leandro/easydrop/lab/NfcBeam.kt` — HCE + reader mode.
-- `lab/src/main/java/dev/leandro/easydrop/lab/LabController.kt` — estados e modos.
-- `lab/src/main/java/dev/leandro/easydrop/lab/MainActivity.kt` — UI, permissões, adb.
-- `app/src/main/java/dev/leandro/easydrop/diag/LanTransfer.kt` — terceira cópia da transferência.
+- `lab/src/main/java/dev/leandro/quicklydrop/lab/HotspotLink.kt` — `WifiLock`, hotspot, WNS.
+- `lab/src/main/java/dev/leandro/quicklydrop/lab/TcpLink.kt` — transferência, ACK, buffers.
+- `lab/src/main/java/dev/leandro/quicklydrop/lab/LanMode.kt` — mDNS + TCP (caminho separado).
+- `lab/src/main/java/dev/leandro/quicklydrop/lab/WifiDirectMode.kt` — grupo, NFC, descoberta.
+- `lab/src/main/java/dev/leandro/quicklydrop/lab/P2pConfig.kt` — SSID/senha/frequência.
+- `lab/src/main/java/dev/leandro/quicklydrop/lab/P2pCleanup.kt` — grupo velho.
+- `lab/src/main/java/dev/leandro/quicklydrop/lab/BleMode.kt` — BLE + GATT + hotspot.
+- `lab/src/main/java/dev/leandro/quicklydrop/lab/NfcBeam.kt` — HCE + reader mode.
+- `lab/src/main/java/dev/leandro/quicklydrop/lab/LabController.kt` — estados e modos.
+- `lab/src/main/java/dev/leandro/quicklydrop/lab/MainActivity.kt` — UI, permissões, adb.
+- `app/src/main/java/dev/leandro/quicklydrop/diag/LanTransfer.kt` — terceira cópia da transferência.
 - `PLANO.md` — plano técnico e medições.
 - `README.md` — visão do produto e comandos.
