@@ -26,8 +26,10 @@ class SecureChannel(
         if (ciphertext.size > MAX_CIPHERTEXT) {
             throw ProtocolException("ciphertext of ${ciphertext.size} bytes exceeds the limit")
         }
-        output.write(ByteBuffer.allocate(4).putInt(ciphertext.size).array())
-        output.write(ciphertext)
+        val frame = ByteArray(4 + ciphertext.size)
+        ByteBuffer.wrap(frame).putInt(ciphertext.size)
+        ciphertext.copyInto(frame, destinationOffset = 4)
+        output.write(frame)
         output.flush()
     }
 
@@ -39,5 +41,10 @@ class SecureChannel(
         }
         val ciphertext = StreamIO.readExactly(input, length, allowEof = false)!!
         return FrameCodec.decode(transport.decrypt(ciphertext))
+    }
+
+    /** Wipes the Noise cipher states. Closing the streams is the caller's job. */
+    fun destroy() {
+        transport.destroy()
     }
 }

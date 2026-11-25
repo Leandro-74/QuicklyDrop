@@ -22,6 +22,9 @@ class TransferSender(
     private val limits: TransferLimits = TransferLimits(),
 ) {
 
+    private var lastProgressAt = 0L
+    private var hasProgress = false
+
     fun send(
         files: List<FileSource>,
         cancelled: () -> Boolean = { false },
@@ -100,7 +103,7 @@ class TransferSender(
                         channel.send(Frame.Data(index, fileBytes, buffer.copyOf(read)))
                         fileBytes += read
                         transferred += read
-                        listener.onProgress(
+                        reportProgress(
                             TransferProgress(
                                 fileIndex = index,
                                 filesTotal = files.size,
@@ -187,6 +190,16 @@ class TransferSender(
         }
     }
 
+    private fun reportProgress(progress: TransferProgress) {
+        val now = System.nanoTime()
+        val finishedFile = progress.fileBytes == progress.file.size
+        if (!hasProgress || finishedFile || now - lastProgressAt >= PROGRESS_INTERVAL_NS) {
+            hasProgress = true
+            lastProgressAt = now
+            listener.onProgress(progress)
+        }
+    }
+
     private fun nextFrame(): Frame = channel.receive()
         ?: throw TransferException(TransferFailure.IO, "connection closed")
 
@@ -216,5 +229,9 @@ class TransferSender(
         }
         val message = error.message.orEmpty().take(200)
         runCatching { channel.send(Frame.Error(error.failure.toErrorCode(), message)) }
+    }
+
+    private companion object {
+        const val PROGRESS_INTERVAL_NS = 250_000_000L
     }
 }
