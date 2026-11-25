@@ -1,6 +1,6 @@
 # Arquitetura
 
-> Estado atual: laboratório (`:lab`) e diagnóstico (`:app`).
+> Estado atual: laboratório (`:lab`), diagnóstico (`:diag`) e base do `:core`.
 > Alvo da Fase 1: `:protocol` (JVM puro) + `:core` (Android) + `:app` (produto).
 
 ## 1. Módulos
@@ -13,8 +13,8 @@
 | `:lab` | Android app | Experimentos de protocolo, benchmarks, testes de rádio |
 | `:diag` | Android app | Diagnóstico de capacidades e exportação de relatório |
 
-O `:app` atual é o diagnóstico. A migração renomeia esse módulo para `:diag` e cria um
-`:app` novo; o `:lab` continua existindo como ferramenta de desenvolvimento.
+O antigo `:app` de diagnóstico foi renomeado para `:diag`; o `:app` de produto ainda será
+criado. O `:lab` continua existindo como ferramenta de desenvolvimento.
 
 ## 2. Dependências
 

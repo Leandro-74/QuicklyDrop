@@ -3,8 +3,9 @@
 Compartilhamento de arquivos por proximidade entre dispositivos Android. A transferência
 ocorre inteiramente entre os dois aparelhos: sem conta, sem nuvem, sem servidor.
 
-> **Status:** Fase 0 concluída. O repositório contém a ferramenta de diagnóstico (`:app`) e o
-> laboratório de protocolos (`:lab`). O app de produto (Fase 1) ainda não foi implementado.
+> **Status:** Fase 0 concluída. O repositório contém a ferramenta de diagnóstico (`:diag`), o
+> laboratório de protocolos (`:lab`) e a base do `:core`. O app de produto (Fase 1) ainda não
+> foi implementado.
 
 ---
 
@@ -64,7 +65,8 @@ representam todos os Androids.
 ## Estrutura
 
 ```
-app/            ferramenta de diagnóstico (capacidades de rádio, hotspot, BLE, throughput)
+diag/           ferramenta de diagnóstico (capacidades de rádio, hotspot, BLE, throughput)
+core/           biblioteca Android: transporte TCP e, na Fase 1, sessão e armazenamento
 lab/            laboratório de protocolos: testa um caminho de conexão por vez
 protocol/       protocolo v1 em JVM pura: payload NFC, Noise NK, frames e canal seguro
 docs/           PROTOCOL.md, ARCHITECTURE.md, SECURITY.md e NAMING.md
@@ -97,7 +99,7 @@ Os quatro modos usam o mesmo `TcpLink`: ACK final de 10 s, timeout de inatividad
 Testes:
 
 ```bash
-./gradlew :protocol:test :lab:testDebugUnitTest
+./gradlew :protocol:test :core:testDebugUnitTest :lab:testDebugUnitTest :diag:testDebugUnitTest
 ```
 
 ## Compilar
@@ -107,9 +109,9 @@ Requisitos: JDK 21 e Android SDK 35 (platform + build-tools).
 ```bash
 echo "sdk.dir=$HOME/Android/Sdk" > local.properties
 
-./gradlew :lab:assembleDebug :app:assembleDebug
+./gradlew :lab:assembleDebug :diag:assembleDebug
 adb install -r lab/build/outputs/apk/debug/lab-debug.apk
-adb install -r app/build/outputs/apk/debug/app-debug.apk
+adb install -r diag/build/outputs/apk/debug/diag-debug.apk
 ```
 
 ## Ferramenta de diagnóstico
