@@ -17,6 +17,7 @@ object P2pPermissions {
             add(Manifest.permission.POST_NOTIFICATIONS)
         } else {
             add(Manifest.permission.ACCESS_FINE_LOCATION)
+            add(Manifest.permission.ACCESS_COARSE_LOCATION)
         }
     }
 }

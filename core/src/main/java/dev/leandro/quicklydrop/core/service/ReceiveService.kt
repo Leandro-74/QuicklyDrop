@@ -6,7 +6,9 @@ import android.content.Context
 import android.content.Intent
 import android.content.pm.ServiceInfo
 import android.os.Build
+import android.os.Handler
 import android.os.IBinder
+import android.os.Looper
 import android.os.SystemClock
 import dev.leandro.quicklydrop.core.p2p.AndroidP2pTransport
 import dev.leandro.quicklydrop.core.session.ReceiveSession
@@ -27,6 +29,7 @@ import java.util.concurrent.Executors
 class ReceiveService : Service() {
 
     private val executor = Executors.newSingleThreadExecutor()
+    private val mainHandler = Handler(Looper.getMainLooper())
     private val notifications by lazy { getSystemService(NotificationManager::class.java) }
 
     @Volatile
@@ -156,6 +159,14 @@ class ReceiveService : Service() {
     }
 
     private fun finish(result: TransferResult) {
+        if (Looper.myLooper() == Looper.getMainLooper()) {
+            finishOnMain(result)
+        } else {
+            mainHandler.post { finishOnMain(result) }
+        }
+    }
+
+    private fun finishOnMain(result: TransferResult) {
         if (stopping) {
             stopSelf()
             return
