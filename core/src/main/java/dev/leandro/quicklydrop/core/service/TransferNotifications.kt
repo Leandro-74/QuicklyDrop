@@ -31,6 +31,14 @@ object TransferNotifications {
         manager.createNotificationChannel(channel)
     }
 
+    fun starting(context: Context): Notification =
+        base(context)
+            .setContentTitle(context.getString(R.string.notification_starting_title))
+            .setContentText(context.getString(R.string.notification_starting_text))
+            .setOngoing(true)
+            .addAction(0, context.getString(R.string.notification_cancel), stopIntent(context))
+            .build()
+
     fun ready(context: Context, displayName: String): Notification =
         base(context)
             .setContentTitle(context.getString(R.string.notification_ready_title))

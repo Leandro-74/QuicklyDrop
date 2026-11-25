@@ -25,6 +25,8 @@ sealed interface TransferStatusState {
 
     data object Idle : TransferStatusState
 
+    data object Preparing : TransferStatusState
+
     data class Armed(val displayName: String) : TransferStatusState
 
     data class Active(val progress: TransferProgress) : TransferStatusState

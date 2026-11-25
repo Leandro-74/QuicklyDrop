@@ -197,6 +197,19 @@ private fun ReceiveContent(
     Spacer(Modifier.height(24.dp))
 
     when (state) {
+        is TransferStatusState.Preparing -> {
+            Text(
+                text = stringResource(R.string.receive_starting),
+                style = MaterialTheme.typography.titleLarge,
+            )
+            Spacer(Modifier.height(24.dp))
+            CircularProgressIndicator()
+            Spacer(Modifier.height(24.dp))
+            OutlinedButton(onClick = onStopReceive, modifier = Modifier.fillMaxWidth()) {
+                Text(stringResource(R.string.receive_cancel))
+            }
+        }
+
         is TransferStatusState.Armed -> {
             Text(
                 text = stringResource(R.string.receive_ready),

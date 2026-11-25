@@ -38,6 +38,7 @@ class ReceiveService : Service() {
     @Volatile
     private var stopping = false
 
+    private var starting = false
     private var lastNotificationAt = 0L
 
     override fun onCreate() {
@@ -58,6 +59,7 @@ class ReceiveService : Service() {
 
     override fun onDestroy() {
         stopping = true
+        starting = false
         session?.cancel()
         session = null
         executor.shutdownNow()
@@ -65,15 +67,17 @@ class ReceiveService : Service() {
     }
 
     private fun arm() {
-        stopping = false
-        session?.cancel()
-        session = null
+        if (starting || session != null) return
 
-        val displayName = Build.MODEL?.takeIf { it.isNotBlank() }?.take(64) ?: "QuicklyDrop"
+        starting = true
+        stopping = false
+        lastNotificationAt = 0L
+
+        val displayName = Build.MODEL.takeIf { it.isNotBlank() }?.take(64) ?: "QuicklyDrop"
         try {
             startForeground(
                 TransferNotifications.NOTIFICATION_ID,
-                TransferNotifications.ready(this, displayName),
+                TransferNotifications.starting(this),
                 ServiceInfo.FOREGROUND_SERVICE_TYPE_CONNECTED_DEVICE,
             )
         } catch (e: Exception) {
@@ -81,13 +85,14 @@ class ReceiveService : Service() {
             return
         }
 
-        TransferStatus.update(TransferStatusState.Armed(displayName))
+        TransferStatus.update(TransferStatusState.Preparing)
         executor.execute { runSession(displayName) }
     }
 
     private fun runSession(displayName: String) {
         if (stopping) return
 
+        var activeSession: ReceiveSession? = null
         try {
             val p2p = AndroidP2pTransport(this)
             if (stopping) {
@@ -97,17 +102,20 @@ class ReceiveService : Service() {
 
             val sink = MediaStoreFileSink(AndroidMediaStoreGateway(contentResolver))
             val listener = object : ReceiveSession.Listener {
+                private fun current(): Boolean = session === activeSession
+
                 override fun onArmed(payload: dev.leandro.quicklydrop.protocol.DiscoveryPayload) {
-                    notifyReady(displayName)
+                    if (current()) notifyReady(displayName)
                 }
 
                 override fun onProgress(progress: TransferProgress) {
+                    if (!current()) return
                     TransferStatus.update(TransferStatusState.Active(progress))
                     notifyProgress(progress)
                 }
 
                 override fun onCompleted(result: TransferResult) {
-                    finish(result)
+                    if (current()) finish(result)
                 }
             }
 
@@ -117,6 +125,7 @@ class ReceiveService : Service() {
                 displayName = displayName,
                 listener = listener,
             )
+            activeSession = active
             session = active
             if (stopping) {
                 active.cancel()
@@ -124,15 +133,19 @@ class ReceiveService : Service() {
             }
             active.run()
         } catch (e: Exception) {
-            finish(
-                TransferResult.Failure(
-                    TransferFailure.INTERNAL,
-                    e.message ?: "cannot receive",
-                    e,
-                ),
-            )
+            if (session === activeSession) {
+                finish(
+                    TransferResult.Failure(
+                        TransferFailure.INTERNAL,
+                        e.message ?: "cannot receive",
+                        e,
+                    ),
+                )
+            }
         } finally {
-            session = null
+            if (activeSession != null && session === activeSession) {
+                session = null
+            }
         }
     }
 
@@ -167,6 +180,9 @@ class ReceiveService : Service() {
     }
 
     private fun finishOnMain(result: TransferResult) {
+        starting = false
+        session = null
+        lastNotificationAt = 0L
         if (stopping) {
             stopSelf()
             return
@@ -184,8 +200,10 @@ class ReceiveService : Service() {
 
     private fun stopSession() {
         stopping = true
+        starting = false
         session?.cancel()
         session = null
+        lastNotificationAt = 0L
         TransferStatus.reset()
         stopForeground(STOP_FOREGROUND_REMOVE)
         stopSelf()

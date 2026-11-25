@@ -14,6 +14,7 @@
     <string name="back">Back</string>
     <string name="retry">Try again</string>
 
+    <string name="receive_starting">Starting receiver…</string>
     <string name="receive_ready">Ready to receive</string>
     <string name="receive_tap">Tap the sender\'s phone to this phone.</string>
     <string name="receive_keep_open">Keep the app open while the transfer runs.</string>
@@ -35,6 +36,11 @@
     <string name="location_services_needed">Turn on location services to use Wi-Fi Direct on Android 10 to 12.</string>
     <string name="no_files">No files were selected.</string>
     <string name="file_read_failed">Could not read the selected files.</string>
+    <string name="some_files_failed">%1$d file(s) could not be read.</string>
+    <string name="stop_receiving_first">Stop receiving before sending a file.</string>
+    <string name="finish_sending_first">Finish sending before receiving a file.</string>
+    <string name="cannot_start_receiver">Cannot start receiver.</string>
+    <string name="cannot_stop_receiver">Cannot stop receiver.</string>
     <string name="working">Working…</string>
     <string name="transfer_progress">%1$s of %2$s</string>
     <string name="file_count">%1$d file(s)</string>

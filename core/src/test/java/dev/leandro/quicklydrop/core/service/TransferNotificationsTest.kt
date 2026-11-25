@@ -35,6 +35,17 @@ class TransferNotificationsTest {
     }
 
     @Test
+    fun `starting notification is ongoing`() {
+        val notification = TransferNotifications.starting(context)
+
+        assertEquals(
+            "Starting receiver",
+            notification.extras.getString(Notification.EXTRA_TITLE),
+        )
+        assertTrue(notification.flags and Notification.FLAG_ONGOING_EVENT != 0)
+    }
+
+    @Test
     fun `ready notification is ongoing and cancellable`() {
         val notification = TransferNotifications.ready(context, "Pixel")
 
