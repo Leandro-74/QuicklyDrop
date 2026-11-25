@@ -1,6 +1,7 @@
 package dev.leandro.quicklydrop.core.p2p
 
 import android.Manifest
+import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -25,5 +26,11 @@ class P2pPermissionsTest {
         assertTrue(Manifest.permission.ACCESS_COARSE_LOCATION in permissions)
         assertFalse(Manifest.permission.NEARBY_WIFI_DEVICES in permissions)
         assertFalse(Manifest.permission.POST_NOTIFICATIONS in permissions)
+    }
+
+    @Test
+    fun `wifi permission follows the api level`() {
+        assertEquals(Manifest.permission.NEARBY_WIFI_DEVICES, P2pPermissions.wifiPermission(35))
+        assertEquals(Manifest.permission.ACCESS_FINE_LOCATION, P2pPermissions.wifiPermission(32))
     }
 }

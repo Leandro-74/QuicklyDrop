@@ -1,6 +1,5 @@
 package dev.leandro.quicklydrop.app
 
-import android.Manifest
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.location.LocationManager
@@ -27,7 +26,7 @@ class MainActivity : ComponentActivity() {
     ) {
         val action = pendingPermissionAction
         pendingPermissionAction = null
-        if (hasWifiPermission()) {
+        if (P2pPermissions.hasWifiPermission(this)) {
             action?.invoke()
         } else if (action != null) {
             viewModel.showMessage(getString(R.string.permission_needed))
@@ -146,7 +145,7 @@ class MainActivity : ComponentActivity() {
     }
 
     private fun withWifiPermission(action: () -> Unit) {
-        if (!hasWifiPermission()) {
+        if (!P2pPermissions.hasWifiPermission(this)) {
             pendingPermissionAction = { withWifiPermission(action) }
             permissionLauncher.launch(
                 P2pPermissions.required(Build.VERSION.SDK_INT).toTypedArray(),
@@ -162,21 +161,11 @@ class MainActivity : ComponentActivity() {
         action()
     }
 
-    private fun hasWifiPermission(): Boolean =
-        checkSelfPermission(wifiPermission()) == PackageManager.PERMISSION_GRANTED
-
     private fun locationServicesEnabled(): Boolean {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) return true
         val manager = getSystemService(LocationManager::class.java) ?: return false
         return manager.isLocationEnabled
     }
-
-    private fun wifiPermission(): String =
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-            Manifest.permission.NEARBY_WIFI_DEVICES
-        } else {
-            Manifest.permission.ACCESS_FINE_LOCATION
-        }
 
     private fun requestMissingPermissions() {
         val missing = P2pPermissions.required(Build.VERSION.SDK_INT)

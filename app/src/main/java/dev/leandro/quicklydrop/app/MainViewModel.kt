@@ -39,12 +39,15 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
     private var sources: List<FileSource> = emptyList()
 
+    private val sessionLock = Any()
+
     @Volatile
     private var session: SendSession? = null
 
     @Volatile
     private var cancelRequested = false
 
+    @Volatile
     private var sendGeneration = 0
 
     fun prepareSend(uris: List<Uri>) {
@@ -57,20 +60,25 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             return
         }
         if (isReceiving()) {
-            showMessage("Stop receiving before sending a file.")
+            showMessage(app.getString(R.string.stop_receiving_first))
             return
         }
 
+        val selected = uris.distinct()
         _sendState.value = SendState.Loading
         viewModelScope.launch {
             val loaded = withContext(Dispatchers.IO) {
-                uris.distinct().mapNotNull { uri ->
+                selected.mapNotNull { uri ->
                     runCatching { ContentUriFileSource(app.contentResolver, uri) }.getOrNull()
                 }
             }
             if (loaded.isEmpty()) {
                 _sendState.value = SendState.Error(app.getString(R.string.file_read_failed))
                 return@launch
+            }
+            val skipped = selected.size - loaded.size
+            if (skipped > 0) {
+                showMessage(app.getString(R.string.some_files_failed, skipped))
             }
             sources = loaded
             _sendState.value = SendState.Ready(loaded.map { it.meta })
@@ -103,25 +111,56 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         _sendState.value = SendState.Sending(metas)
 
         viewModelScope.launch {
+            var activeSession: SendSession? = null
+
             val result = withContext(Dispatchers.IO) {
                 try {
-                    if (cancelRequested) {
+                    if (generation != sendGeneration || cancelRequested) {
                         return@withContext TransferResult.Failure(
                             TransferFailure.CANCELLED,
                             "cancelled",
                         )
                     }
+
                     val p2p = AndroidP2pTransport(app)
+                    if (generation != sendGeneration) {
+                        p2p.close()
+                        return@withContext TransferResult.Failure(
+                            TransferFailure.CANCELLED,
+                            "cancelled",
+                        )
+                    }
+
                     val active = SendSession(
                         p2p = p2p,
                         files = current,
                         listener = object : TransferListener {
                             override fun onProgress(progress: TransferProgress) {
-                                _sendState.value = SendState.Sending(metas, progress)
+                                if (generation == sendGeneration) {
+                                    _sendState.value = SendState.Sending(metas, progress)
+                                }
                             }
                         },
                     )
-                    session = active
+                    activeSession = active
+
+                    val accepted = synchronized(sessionLock) {
+                        if (generation != sendGeneration) {
+                            false
+                        } else {
+                            session = active
+                            true
+                        }
+                    }
+                    if (!accepted) {
+                        active.cancel()
+                        p2p.close()
+                        return@withContext TransferResult.Failure(
+                            TransferFailure.CANCELLED,
+                            "cancelled",
+                        )
+                    }
+
                     if (cancelRequested) active.cancel()
                     active.run(payload)
                 } catch (e: Exception) {
@@ -132,7 +171,10 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                     )
                 }
             }
-            session = null
+
+            synchronized(sessionLock) {
+                if (session === activeSession) session = null
+            }
             if (generation == sendGeneration) {
                 _sendState.value = SendState.Finished(result)
             }
@@ -141,7 +183,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
     fun cancelSend() {
         cancelRequested = true
-        session?.cancel()
+        synchronized(sessionLock) { session }?.cancel()
     }
 
     fun retrySend() {
@@ -154,26 +196,32 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
     fun dismissSend() {
         cancelRequested = true
-        session?.cancel()
-        session = null
+        val active = synchronized(sessionLock) {
+            sendGeneration++
+            session.also { session = null }
+        }
+        active?.cancel()
         sources = emptyList()
-        sendGeneration++
         _sendState.value = SendState.Idle
     }
 
     fun startReceive(context: Context) {
-        if (_sendState.value is SendState.Ready || _sendState.value is SendState.Sending) {
-            showMessage("Finish sending before receiving a file.")
+        if (
+            _sendState.value is SendState.Loading ||
+            _sendState.value is SendState.Ready ||
+            _sendState.value is SendState.Sending
+        ) {
+            showMessage(app.getString(R.string.finish_sending_first))
             return
         }
         TransferStatus.reset()
         runCatching { ReceiveService.start(context) }
-            .onFailure { showMessage(it.message ?: "cannot start receiver") }
+            .onFailure { showMessage(it.message ?: app.getString(R.string.cannot_start_receiver)) }
     }
 
     fun stopReceive(context: Context) {
         runCatching { ReceiveService.stop(context) }
-            .onFailure { showMessage(it.message ?: "cannot stop receiver") }
+            .onFailure { showMessage(it.message ?: app.getString(R.string.cannot_stop_receiver)) }
         TransferStatus.reset()
     }
 
@@ -191,13 +239,16 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
     override fun onCleared() {
         cancelRequested = true
-        session?.cancel()
-        session = null
+        val active = synchronized(sessionLock) {
+            sendGeneration++
+            session.also { session = null }
+        }
+        active?.cancel()
         super.onCleared()
     }
 
     private fun isReceiving(): Boolean = when (TransferStatus.state.value) {
-        is TransferStatusState.Armed, is TransferStatusState.Active -> true
+        is TransferStatusState.Preparing, is TransferStatusState.Armed, is TransferStatusState.Active -> true
         else -> false
     }
 

@@ -1,6 +1,8 @@
 package dev.leandro.quicklydrop.core.p2p
 
 import android.Manifest
+import android.content.Context
+import android.content.pm.PackageManager
 import android.os.Build
 
 /**
@@ -20,4 +22,15 @@ object P2pPermissions {
             add(Manifest.permission.ACCESS_COARSE_LOCATION)
         }
     }
+
+    fun wifiPermission(sdk: Int): String =
+        if (sdk >= Build.VERSION_CODES.TIRAMISU) {
+            Manifest.permission.NEARBY_WIFI_DEVICES
+        } else {
+            Manifest.permission.ACCESS_FINE_LOCATION
+        }
+
+    fun hasWifiPermission(context: Context): Boolean =
+        context.checkSelfPermission(wifiPermission(Build.VERSION.SDK_INT)) ==
+            PackageManager.PERMISSION_GRANTED
 }
