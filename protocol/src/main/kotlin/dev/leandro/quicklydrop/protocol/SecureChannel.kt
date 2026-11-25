@@ -5,53 +5,39 @@ import java.io.OutputStream
 import java.nio.ByteBuffer
 
 /**
- * Canal de frames cifrados sobre um par de streams.
+ * Encrypted frame channel over a pair of streams.
  *
- * Cada frame é enviado como `u32 ciphertextLength` + ciphertext Noise. O prefixo não é
- * cifrado; o conteúdo e o tipo são.
+ * Each frame is sent as `u32 ciphertextLength` followed by the Noise ciphertext. The
+ * length prefix is not encrypted; the content and the frame type are.
  */
 class SecureChannel(
     private val input: InputStream,
     private val output: OutputStream,
     private val transport: NoiseTransport,
-) {
+) : FrameChannel {
 
     companion object {
         const val MAX_CIPHERTEXT = 65535
     }
 
-    fun send(frame: Frame) {
+    override fun send(frame: Frame) {
         val plaintext = FrameCodec.encode(frame)
         val ciphertext = transport.encrypt(plaintext)
         if (ciphertext.size > MAX_CIPHERTEXT) {
-            throw ProtocolException("ciphertext de ${ciphertext.size} bytes acima do limite")
+            throw ProtocolException("ciphertext of ${ciphertext.size} bytes exceeds the limit")
         }
         output.write(ByteBuffer.allocate(4).putInt(ciphertext.size).array())
         output.write(ciphertext)
         output.flush()
     }
 
-    fun receive(): Frame? {
-        val header = readExactly(4, allowEof = true) ?: return null
+    override fun receive(): Frame? {
+        val header = StreamIO.readExactly(input, 4, allowEof = true) ?: return null
         val length = ByteBuffer.wrap(header).int
         if (length !in 1..MAX_CIPHERTEXT) {
-            throw ProtocolException("tamanho de ciphertext inválido: $length")
+            throw ProtocolException("invalid ciphertext length: $length")
         }
-        val ciphertext = readExactly(length, allowEof = false)!!
+        val ciphertext = StreamIO.readExactly(input, length, allowEof = false)!!
         return FrameCodec.decode(transport.decrypt(ciphertext))
-    }
-
-    private fun readExactly(length: Int, allowEof: Boolean): ByteArray? {
-        val bytes = ByteArray(length)
-        var read = 0
-        while (read < length) {
-            val count = input.read(bytes, read, length - read)
-            if (count < 0) {
-                if (read == 0 && allowEof) return null
-                throw ProtocolException("stream terminou no meio do frame")
-            }
-            read += count
-        }
-        return bytes
     }
 }
