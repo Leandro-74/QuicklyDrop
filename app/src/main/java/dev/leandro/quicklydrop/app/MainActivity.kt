@@ -3,6 +3,7 @@ package dev.leandro.quicklydrop.app
 import android.Manifest
 import android.content.Intent
 import android.content.pm.PackageManager
+import android.location.LocationManager
 import android.os.Build
 import android.os.Bundle
 import androidx.activity.ComponentActivity
@@ -145,19 +146,30 @@ class MainActivity : ComponentActivity() {
     }
 
     private fun withWifiPermission(action: () -> Unit) {
-        if (hasWifiPermission()) {
-            action()
+        if (!hasWifiPermission()) {
+            pendingPermissionAction = { withWifiPermission(action) }
+            permissionLauncher.launch(
+                P2pPermissions.required(Build.VERSION.SDK_INT).toTypedArray(),
+            )
             return
         }
 
-        pendingPermissionAction = action
-        permissionLauncher.launch(
-            P2pPermissions.required(Build.VERSION.SDK_INT).toTypedArray(),
-        )
+        if (!locationServicesEnabled()) {
+            viewModel.showMessage(getString(R.string.location_services_needed))
+            return
+        }
+
+        action()
     }
 
     private fun hasWifiPermission(): Boolean =
         checkSelfPermission(wifiPermission()) == PackageManager.PERMISSION_GRANTED
+
+    private fun locationServicesEnabled(): Boolean {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) return true
+        val manager = getSystemService(LocationManager::class.java) ?: return false
+        return manager.isLocationEnabled
+    }
 
     private fun wifiPermission(): String =
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {

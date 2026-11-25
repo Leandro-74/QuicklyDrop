@@ -22,6 +22,7 @@ class P2pPermissionsTest {
         val permissions = P2pPermissions.required(32)
 
         assertTrue(Manifest.permission.ACCESS_FINE_LOCATION in permissions)
+        assertTrue(Manifest.permission.ACCESS_COARSE_LOCATION in permissions)
         assertFalse(Manifest.permission.NEARBY_WIFI_DEVICES in permissions)
         assertFalse(Manifest.permission.POST_NOTIFICATIONS in permissions)
     }

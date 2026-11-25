@@ -32,6 +32,7 @@
     <string name="scanning">Waiting for the receiver\'s NFC tag…</string>
 
     <string name="permission_needed">Wi-Fi permission is required to transfer files.</string>
+    <string name="location_services_needed">Turn on location services to use Wi-Fi Direct on Android 10 to 12.</string>
     <string name="no_files">No files were selected.</string>
     <string name="file_read_failed">Could not read the selected files.</string>
     <string name="working">Working…</string>
