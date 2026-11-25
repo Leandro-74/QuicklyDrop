@@ -51,6 +51,7 @@ class AndroidMediaStoreGatewayTest {
         assertEquals("text/plain", values.getAsString(MediaStore.Downloads.MIME_TYPE))
         assertEquals("Download/QuicklyDrop/", values.getAsString(MediaStore.Downloads.RELATIVE_PATH))
         assertEquals(1, values.getAsInteger(MediaStore.Downloads.IS_PENDING))
+        assertTrue(values.getAsLong(MediaStore.MediaColumns.DATE_EXPIRES) > 0)
     }
 
     @Test

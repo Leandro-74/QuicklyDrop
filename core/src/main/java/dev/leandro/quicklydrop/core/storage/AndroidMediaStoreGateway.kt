@@ -4,8 +4,9 @@ import android.content.ContentResolver
 import android.content.ContentValues
 import android.net.Uri
 import android.os.Environment
-import android.provider.MediaStore
 import android.os.StatFs
+import android.provider.MediaStore
+import android.util.Log
 import java.io.IOException
 import java.io.OutputStream
 
@@ -33,6 +34,10 @@ class AndroidMediaStoreGateway(
             put(MediaStore.Downloads.MIME_TYPE, mimeType)
             put(MediaStore.Downloads.RELATIVE_PATH, relativePath)
             put(MediaStore.Downloads.IS_PENDING, 1)
+            put(
+                MediaStore.MediaColumns.DATE_EXPIRES,
+                System.currentTimeMillis() + PENDING_EXPIRATION_MS,
+            )
         }
         return resolver.insert(MediaStore.Downloads.EXTERNAL_CONTENT_URI, values)
             ?: throw IOException("MediaStore did not create $displayName")
@@ -51,14 +56,20 @@ class AndroidMediaStoreGateway(
     }
 
     override fun delete(uri: Uri) {
-        resolver.delete(uri, null, null)
+        if (resolver.delete(uri, null, null) <= 0) {
+            Log.w(TAG, "MediaStore delete failed for $uri")
+        }
     }
 
     override fun availableBytes(): Long = freeSpace()
 
     private companion object {
+        const val TAG = "QuicklyDropMediaStore"
+        const val PENDING_EXPIRATION_MS = 24 * 60 * 60 * 1000L
+
         fun defaultFreeSpace(): Long =
             runCatching {
+                // shortcut: assumes the primary external volume; MediaStore may use another volume.
                 StatFs(Environment.getExternalStorageDirectory().absolutePath).availableBytes
             }.getOrDefault(-1)
     }

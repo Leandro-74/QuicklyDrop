@@ -19,6 +19,7 @@ object DisplayName {
                     when {
                         ch == '/' || ch == '\\' -> '_'
                         ch.code < 0x20 || ch.code == 0x7F -> '_'
+                        isBidiControl(ch) -> '_'
                         else -> ch
                     },
                 )
@@ -45,6 +46,13 @@ object DisplayName {
         }
         throw IllegalStateException("too many name collisions for $base")
     }
+
+    /** Bidi controls can visually reorder the extension in file managers. */
+    private fun isBidiControl(ch: Char): Boolean =
+        ch in '\u202A'..'\u202E' ||
+            ch in '\u2066'..'\u2069' ||
+            ch == '\u200E' ||
+            ch == '\u200F'
 
     private fun limit(name: String): String {
         if (name.toByteArray(Charsets.UTF_8).size <= MAX_BYTES) return name

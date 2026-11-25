@@ -4,6 +4,7 @@ import android.net.Uri
 import dev.leandro.quicklydrop.core.transfer.FileSink
 import dev.leandro.quicklydrop.core.transfer.FileSinkException
 import dev.leandro.quicklydrop.core.transfer.TransferFailure
+import dev.leandro.quicklydrop.core.transfer.TransferLimits
 import dev.leandro.quicklydrop.protocol.FileMeta
 import java.io.OutputStream
 
@@ -16,7 +17,7 @@ import java.io.OutputStream
 class MediaStoreFileSink(
     private val gateway: MediaStoreGateway,
     private val relativePath: String = DEFAULT_RELATIVE_PATH,
-    private val maxFileSize: Long = 10L * 1024 * 1024 * 1024,
+    private val maxFileSize: Long = TransferLimits.DEFAULT_MAX_FILE_SIZE,
 ) : FileSink {
 
     init {

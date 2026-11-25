@@ -23,6 +23,11 @@ class DisplayNameTest {
     }
 
     @Test
+    fun `strips bidirectional controls`() {
+        assertEquals("a_b.pdf", DisplayName.sanitize("a\u202Eb.pdf"))
+    }
+
+    @Test
     fun `keeps common names intact`() {
         assertEquals("photo.jpg", DisplayName.sanitize("photo.jpg"))
         assertEquals(".bashrc", DisplayName.sanitize(".bashrc"))

@@ -58,12 +58,16 @@ class ContentUriFileSource(
         }
 
         val displayName = name ?: uri.lastPathSegment ?: "file"
-        // FileMeta caps MIME at 127 bytes; providers occasionally return long parameters.
-        val mime = (resolver.getType(uri) ?: "application/octet-stream").take(120)
+        val mime = (resolver.getType(uri) ?: "application/octet-stream").take(MAX_MIME_CHARS)
         return FileMeta(
             name = DisplayName.sanitize(displayName),
             size = size,
             mime = mime,
         )
+    }
+
+    private companion object {
+        // FileMeta caps MIME at 127 bytes; providers occasionally return long parameters.
+        const val MAX_MIME_CHARS = 120
     }
 }
