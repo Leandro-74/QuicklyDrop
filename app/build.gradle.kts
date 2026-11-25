@@ -5,11 +5,11 @@ plugins {
 }
 
 android {
-    namespace = "dev.leandro.easydrop.diag"
+    namespace = "dev.leandro.quicklydrop.diag"
     compileSdk = 35
 
     defaultConfig {
-        applicationId = "dev.leandro.easydrop.diag"
+        applicationId = "dev.leandro.quicklydrop.diag"
         minSdk = 29
         targetSdk = 35
         versionCode = 1

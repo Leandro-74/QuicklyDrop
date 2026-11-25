@@ -5,11 +5,11 @@ plugins {
 }
 
 android {
-    namespace = "dev.leandro.easydrop.lab"
+    namespace = "dev.leandro.quicklydrop.lab"
     compileSdk = 35
 
     defaultConfig {
-        applicationId = "dev.leandro.easydrop.lab"
+        applicationId = "dev.leandro.quicklydrop.lab"
         minSdk = 29
         targetSdk = 35
         versionCode = 1
