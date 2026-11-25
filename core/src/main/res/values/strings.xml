@@ -1,4 +1,15 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="apdu_description">QuicklyDrop</string>
+
+    <string name="notification_channel_name">Transfers</string>
+    <string name="notification_channel_description">File transfers</string>
+    <string name="notification_ready_title">Ready to receive</string>
+    <string name="notification_ready_text">Tap the sender\'s phone to send to %1$s</string>
+    <string name="notification_receiving_title">Receiving %1$s</string>
+    <string name="notification_receiving_text">%1$s of %2$s</string>
+    <string name="notification_complete_title">Transfer complete</string>
+    <string name="notification_complete_text">%1$d file(s), %2$s</string>
+    <string name="notification_failed_title">Transfer failed</string>
+    <string name="notification_cancel">Cancel</string>
 </resources>
