@@ -4,6 +4,7 @@ on:
   push:
     branches: [main]
   pull_request:
+  workflow_dispatch:
 
 permissions:
   contents: read
@@ -11,7 +12,7 @@ permissions:
 jobs:
   test:
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    timeout-minutes: 30
 
     steps:
       - uses: actions/checkout@v4
@@ -23,16 +24,21 @@ jobs:
 
       - uses: android-actions/setup-android@v3
         with:
-          packages: |
-            platforms;android-35
-            build-tools;35.0.0
+          packages: "platforms;android-35 build-tools;35.0.0"
 
       - uses: gradle/actions/setup-gradle@v4
 
-      - name: Testes e build
-        run: ./gradlew :protocol:test :lab:testDebugUnitTest :app:assembleDebug --console=plain
+      - name: Test and build
+        run: >
+          ./gradlew
+          :protocol:test
+          :lab:testDebugUnitTest
+          :app:testDebugUnitTest
+          :lab:assembleDebug
+          :app:assembleDebug
+          --console=plain
 
-      - name: Publica resultados
+      - name: Upload results
         if: always()
         uses: actions/upload-artifact@v4
         with:
@@ -40,4 +46,5 @@ jobs:
           path: |
             protocol/build/test-results/test
             lab/build/test-results/testDebugUnitTest
+            app/build/test-results/testDebugUnitTest
           if-no-files-found: ignore
