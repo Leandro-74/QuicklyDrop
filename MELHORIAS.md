@@ -1,417 +1,419 @@
-# QuicklyDrop — Análise e propostas de evolução
+# QuicklyDrop — Analysis and evolution proposals
 
-> **01/11/2026 · documento de análise e registro.** A primeira rodada de correções e
-> experimentos foi executada nos dois aparelhos. O que foi aceito, o que foi rejeitado e o
-> número medido de cada item estão na seção 1.1.
+> Historical record of the Phase 0 lab work and corrections. For current product status, see [README.md](README.md).
+
+> **01/11/2026 · analysis and record document.** The first round of corrections and
+> experiments was run on both devices. What was accepted, what was rejected, and the
+> measured number for each item are in section 1.1.
 
 ---
 
-## 1. Leitura rápida
+## 1. Quick overview
 
-O laboratório já provou o caminho principal: o NFC entrega as credenciais, o receptor cria o
-grupo Wi-Fi Direct em 5745 MHz, o emissor entra direto com SSID/senha e o TCP sustenta
-35–48 MB/s com setup de ~0,86 s de mediana. O que falta não é "fazer funcionar"; é transformar
-o experimento em produto.
+The lab has already proven the main path: NFC delivers the credentials, the receiver creates the
+Wi-Fi Direct group at 5745 MHz, the sender joins directly with SSID/password, and TCP sustains
+35–48 MB/s with a setup of ~0.86 s median. What is missing is not "making it work"; it is turning
+the experiment into a product.
 
-Prioridades, em ordem:
+Priorities, in order:
 
-1. **Medir melhor antes de otimizar.** Criar um harness de benchmark e corrigir o `setupMs`,
-   que hoje mostra o tempo total no lugar do tempo de conexão.
-2. **Consertar o `WifiLock`.** Falta a permissão `WAKE_LOCK`; o lock provavelmente nunca foi
-   adquirido e o log diz que está ativo. Isso pode mudar a conclusão sobre o hotspot.
-3. **Cancelamento de verdade.** `Parar` durante a transferência não fecha o socket ativo; a
-   thread e o rádio continuam trabalhando.
-4. **Unificar o caminho de transferência.** LAN e P2P usam códigos diferentes; um tem ACK, o
-   outro não, e os números não são comparáveis.
-5. **Começar o MVP real.** Arquivo de verdade, share sheet, MediaStore, hash, progresso e
-   cancelamento — o laboratório de 16 MB já cumpriu o papel dele.
-6. **Criptografia antes de expor para fora.** O lab transfere texto claro; o produto precisa de
-   handshake, chave de sessão e confirmação.
+1. **Measure better before optimizing.** Create a benchmark harness and fix `setupMs`,
+   which today shows the total time instead of the connection time.
+2. **Fix the `WifiLock`.** The `WAKE_LOCK` permission is missing; the lock was probably never
+   acquired and the log says it is active. This can change the conclusion about the hotspot.
+3. **Real cancellation.** "Stop" during the transfer does not close the active socket; the
+   thread and the radio keep working.
+4. **Unify the transfer path.** LAN and P2P use different code; one has ACK, the other does not,
+   and the numbers are not comparable.
+5. **Start the real MVP.** Real file, share sheet, MediaStore, hash, progress and
+   cancellation — the 16 MB lab has served its purpose.
+6. **Encryption before exposing it outward.** The lab transfers cleartext; the product needs a
+   handshake, session key, and confirmation.
 
-Estado: os itens 1–4 foram aplicados e validados; o item 5 é o próximo passo e o 6 vem antes de
-qualquer uso fora do laboratório.
+Status: items 1–4 were applied and validated; item 5 is the next step and 6 comes before
+any use outside the lab.
 
-### 1.1 Resultado da validação
+### 1.1 Validation result
 
-**Correções.** Todas verificadas no aparelho, com teste automatizado quando a lógica é pura.
+**Corrections.** All verified on the device, with an automated test when the logic is pure.
 
-| Item | O que foi feito | Resultado |
+| Item | What was done | Result |
 |---|---|---|
-| C1/E1 | `WAKE_LOCK` declarado e falha do lock registrada | lock aparece em `dumpsys wifi`, mas `mPowerSaveDisableRequests` segue 0 e a taxa não muda (11,6 vs 11,5 MB/s). Mantido: era falha silenciosa. |
-| C2 | `stop` fecha o socket ativo | parada no meio libera a porta 8992 e não deixa grupo; teste de loopback. |
-| C3 | timeouts de ACK (10 s) e inatividade (30 s) | emissor e receptor falham com mensagem clara; 2 testes de loopback. |
-| C4 | `setupMs` separado do total | as duas pontas reportam o mesmo setup; coberto por teste. |
-| C5/E4 | LAN usa o mesmo `TcpLink` | emissor e receptor dentro de 1% (ex.: 2,5 vs 2,5 MB/s); 1 falha de mDNS em 6 execuções. |
-| C6 | chips aceitam troca depois de erro | estado volta para `IDLE`; 3 testes. |
-| C7 | `onDestroy` para o controlador | voltar pelo sistema derruba grupo e porta. |
-| C8 | senha do hotspot mascarada | log mostra `hotspot pronto (AndroidShare_xxxx / ***)`. |
-| C9 | permissões por versão | em API 35 só as "nearby"; localização negada e P2P/BLE/hotspot funcionam. |
-| C11 | `P2pCleanup` sempre como fallback | `Parar` remove o grupo mesmo quando `removeGroup` falha; timeout de 2 s. |
+| C1/E1 | `WAKE_LOCK` declared and lock failure logged | lock appears in `dumpsys wifi`, but `mPowerSaveDisableRequests` remains 0 and the rate does not change (11.6 vs 11.5 MB/s). Kept: it was a silent failure. |
+| C2 | `stop` closes the active socket | stopping mid-transfer frees port 8992 and leaves no group; loopback test. |
+| C3 | ACK timeouts (10 s) and inactivity timeouts (30 s) | sender and receiver fail with a clear message; 2 loopback tests. |
+| C4 | `setupMs` separated from total | both ends report the same setup; covered by test. |
+| C5/E4 | LAN uses the same `TcpLink` | sender and receiver within 1% (e.g., 2.5 vs 2.5 MB/s); 1 mDNS failure in 6 runs. |
+| C6 | chips accept switching after an error | state returns to `IDLE`; 3 tests. |
+| C7 | `onDestroy` stops the controller | leaving through the system tears down the group and the port. |
+| C8 | hotspot password masked | log shows `hotspot ready (AndroidShare_xxxx / ***)`. |
+| C9 | per-version permissions | on API 35 only the "nearby" ones; location denied and P2P/BLE/hotspot work. |
+| C11 | `P2pCleanup` always as fallback | "Stop" removes the group even when `removeGroup` fails; 2 s timeout. |
 
-C10 (P2P sem NFC) e C12 (documentação) seguem: C10 é funcionalidade de produto, C12 foi feito
-nesta rodada.
+C10 (P2P without NFC) and C12 (documentation) remain: C10 is a product feature, C12 was done
+in this round.
 
-**Experimentos.**
+**Experiments.**
 
-| ID | Hipótese | Medição | Decisão |
+| ID | Hypothesis | Measurement | Decision |
 |---|---|---|---|
-| E1 | `WAKE_LOCK` melhora o hotspot | 11,6 vs 11,5 MB/s; lock adquirido, power save intacto | correção mantida, ganho **rejeitado** |
-| E2 | fechar o socket ativo torna o "Parar" imediato | parada < 1 s, porta livre, sem grupo obsoleto | **aceito** |
-| E3 | separar `setupMs` corrige a leitura | setup final igual ao "conectado em Xms" | **aceito** |
-| E4 | unificar a LAN iguala as pontas | diferença < 1% entre emissor e receptor | **aceito** |
-| E5 | broadcast do P2P reduz o setup | mediana 1,14 s → 0,86 s; pior caso 2,16 s → 0,95 s | **aceito** |
-| E7 | buffer de socket de 8 MB melhora a taxa | 40,0 vs 46,7 MB/s de mediana | **rejeitado**; fica 4 MB |
-| E11 | canal 36 rende mais que 149 | `createGroup` falha no Edge e o automático escolhe 5745 MHz | **rejeitado**; fica 149 |
+| E1 | `WAKE_LOCK` improves the hotspot | 11.6 vs 11.5 MB/s; lock acquired, power save intact | fix kept, gain **rejected** |
+| E2 | closing the active socket makes "Stop" immediate | stop < 1 s, port free, no stale group | **accepted** |
+| E3 | separating `setupMs` fixes the reading | final setup equal to "connected in X ms" | **accepted** |
+| E4 | unifying LAN equalizes both ends | difference < 1% between sender and receiver | **accepted** |
+| E5 | P2P broadcast reduces setup | median 1.14 s → 0.86 s; worst case 2.16 s → 0.95 s | **accepted** |
+| E7 | 8 MB socket buffer improves the rate | 40.0 vs 46.7 MB/s median | **rejected**; stays at 4 MB |
+| E11 | channel 36 yields more than 149 | `createGroup` fails on the Edge and automatic picks 5745 MHz | **rejected**; stays at 149 |
 
-Não executados nesta rodada: E6/E8 (arquivo real e térmica exigem a camada de produto), E9
-(grupo persistente), E10 (fluxos paralelos), E12–E19.
-
----
-
-## 2. O que já está sólido
-
-- **Separação de responsabilidades no lab.** `NfcBeam`, `TcpLink`, `HotspotLink`,
-  `P2pCleanup` e os modos têm papéis claros; o mesmo toque NFC serve a transportes diferentes.
-- **Caminho rápido do P2P bem documentado.** A escolha de SSID/senha em vez de `connect` por
-  endereço + WPS eliminou o `UserAuthorizingJoinState` e o diálogo intermitente.
-- **Grupo em 5 GHz fixo com fallback.** 5745 MHz é não-DFS e o código cai para automático se o
-  aparelho recusar.
-- **ACK no TCP.** O emissor espera o receptor drenar os 16 MB; as duas pontas reportam a mesma
-  taxa.
-- **Limpeza de grupo velho.** `P2pCleanup` resolve o caso de grupo sobrevivente ao force-stop.
-- **Teste de regressão do `P2pConfig`.** Pequeno, mas protege a configuração que evita o
-  diálogo.
-- **Log e estado observáveis.** `LabLog` + `StateFlow` + cores por fase tornam o teste por adb
-  simples e repetível.
+Not run in this round: E6/E8 (real file and thermal require the product layer), E9
+(persistent group), E10 (parallel streams), E12–E19.
 
 ---
 
-## 3. Correções e riscos
+## 2. What is already solid
 
-### 3.1 Prioridade alta
+- **Separation of responsibilities in the lab.** `NfcBeam`, `TcpLink`, `HotspotLink`,
+  `P2pCleanup` and the modes have clear roles; the same NFC tap serves different transports.
+- **Fast P2P path well documented.** Choosing SSID/password instead of `connect` by
+  address + WPS eliminated `UserAuthorizingJoinState` and the intermittent dialog.
+- **Group on fixed 5 GHz with fallback.** 5745 MHz is non-DFS and the code falls back to automatic if the
+  device refuses.
+- **ACK in TCP.** The sender waits for the receiver to drain the 16 MB; both ends report the same
+  rate.
+- **Old group cleanup.** `P2pCleanup` handles the case of a group that survives a force-stop.
+- **Regression test for `P2pConfig`.** Small, but it protects the configuration that avoids the
+  dialog.
+- **Observable log and state.** `LabLog` + `StateFlow` + per-phase colors make testing over adb
+  simple and repeatable.
 
-#### C1. `WifiLock` sem `WAKE_LOCK` — o lock nunca foi adquirido — **aplicado**
+---
 
-**Onde:** `lab/src/main/AndroidManifest.xml` (falta a permissão) e
+## 3. Corrections and risks
+
+### 3.1 High priority
+
+#### C1. `WifiLock` without `WAKE_LOCK` — the lock was never acquired — **applied**
+
+**Where:** `lab/src/main/AndroidManifest.xml` (missing permission) and
 `HotspotLink.kt` (`acquireWifiLock`).
 
-**Problema:** qualquer uso de `WifiManager.WifiLock` exige
-`android.permission.WAKE_LOCK`. O manifesto do lab não declara essa permissão. O código faz
-`runCatching { acquire() }` e, em seguida, registra "Wi-Fi: lock de baixa latência ativo"
-independentemente do resultado. Ou seja: a falha é engolida e o log mente.
+**Problem:** any use of `WifiManager.WifiLock` requires
+`android.permission.WAKE_LOCK`. The lab manifest does not declare this permission. The code does
+`runCatching { acquire() }` and then logs "Wi-Fi: low-latency lock active"
+regardless of the result. In other words: the failure is swallowed and the log lies.
 
-**Por que importa:** o `PLANO.md` concluiu que o lock de baixa latência não desliga o power
-save porque `mPowerSaveDisableRequests` estava em 0. Se o lock nunca foi adquirido, essa
-conclusão pode estar errada. O caminho de hotspot pode render mais do que os 12,7 MB/s
-medidos, e a decisão "P2P principal, hotspot reserva" merece ser reavaliada com o lock
-funcionando.
+**Why it matters:** `PLANO.md` concluded that the low-latency lock does not disable power
+save because `mPowerSaveDisableRequests` was at 0. If the lock was never acquired, that
+conclusion may be wrong. The hotspot path may yield more than the 12.7 MB/s
+measured, and the decision "P2P primary, hotspot backup" deserves to be revisited with the lock
+working.
 
-**Correção proposta:**
+**Proposed fix:**
 
-- declarar `<uses-permission android:name="android.permission.WAKE_LOCK" />`;
-- trocar o `runCatching` silencioso por algo que registre sucesso ou falha;
-- opcionalmente, adquirir o lock também no receptor durante a transferência.
+- declare `<uses-permission android:name="android.permission.WAKE_LOCK" />`;
+- replace the silent `runCatching` with something that logs success or failure;
+- optionally, also acquire the lock on the receiver during the transfer.
 
-**Como testar:** rodar o hotspot nas duas direções, 3 vezes cada, antes e depois; conferir
-`adb shell dumpsys wifi | grep -i -E "mPowerSaveDisableRequests|WifiLock"`; comparar MB/s.
-Critério: se a taxa subir de forma consistente (>15%), atualizar o `PLANO.md` e reabrir a
-decisão de transporte. Se não mudar, o lock não era o gargalo.
+**How to test:** run the hotspot in both directions, 3 times each, before and after; check
+`adb shell dumpsys wifi | grep -i -E "mPowerSaveDisableRequests|WifiLock"`; compare MB/s.
+Criterion: if the rate rises consistently (>15%), update `PLANO.md` and reopen the
+transport decision. If it does not change, the lock was not the bottleneck.
 
-**Esforço:** baixo. **Risco:** baixo.
+**Effort:** low. **Risk:** low.
 
-#### C2. `stop()` não interrompe a transferência em andamento — **aplicado**
+#### C2. `stop()` does not interrupt an ongoing transfer — **applied**
 
-**Onde:** `TcpLink.kt` (`stop`), `LanMode.kt` (`stop`), e por consequência `HotspotLink`,
-`BleMode`, `NfcMode` e `WifiDirectMode`.
+**Where:** `TcpLink.kt` (`stop`), `LanMode.kt` (`stop`), and consequently `HotspotLink`,
+`BleMode`, `NfcMode` and `WifiDirectMode`.
 
-**Problema:** `finished` só é checado entre fases. Durante `read`, `write`, `accept` ou a
-espera do ACK, a thread fica bloqueada. `pool.shutdownNow()` interrompe a thread, mas I/O de
-socket não responde a `interrupt`; `server.close()` libera o `accept`, mas não o socket já
-aceito. O socket ativo não é guardado em campo nenhum, então `stop()` não consegue fechá-lo.
+**Problem:** `finished` is only checked between phases. During `read`, `write`, `accept` or the
+ACK wait, the thread is blocked. `pool.shutdownNow()` interrupts the thread, but socket I/O
+does not respond to `interrupt`; `server.close()` releases `accept`, but not the already
+accepted socket. The active socket is not stored in any field, so `stop()` cannot close it.
 
-**Sintoma:** apertar "Parar" no meio da transferência deixa a thread e o rádio trabalhando; ao
-reiniciar, o teste pode encontrar porta ocupada, conexão antiga ou grupo velho. Em um produto,
-isso é pior: o usuário cancela e o arquivo continua sendo enviado/recebido.
+**Symptom:** pressing "Stop" mid-transfer leaves the thread and the radio working; on
+restart, the test may find a busy port, an old connection or a stale group. In a product,
+this is worse: the user cancels and the file keeps being sent/received.
 
-**Correção proposta:**
+**Proposed fix:**
 
-- guardar o socket ativo (`@Volatile private var active: Socket?`);
-- em `stop()`, fechar o socket ativo além do `ServerSocket`;
-- usar `soTimeout` curto (ex.: 1 s) e checar `finished` nos loops;
-- no `send`, usar timeout na leitura do ACK; no `receive`, timeout de inatividade.
+- store the active socket (`@Volatile private var active: Socket?`);
+- in `stop()`, close the active socket in addition to the `ServerSocket`;
+- use a short `soTimeout` (e.g., 1 s) and check `finished` in the loops;
+- in `send`, use a timeout when reading the ACK; in `receive`, an inactivity timeout.
 
-**Como testar:** iniciar uma transferência, chamar `stop` após 1–2 s, reiniciar imediatamente;
-repetir 5 vezes. Critério: nenhuma thread presa, nenhum "Address already in use", nova execução
-funciona e o tempo de parada fica abaixo de 1 s.
+**How to test:** start a transfer, call `stop` after 1–2 s, restart immediately;
+repeat 5 times. Criterion: no stuck thread, no "Address already in use", the new run
+works and the stop time is under 1 s.
 
-**Esforço:** baixo/médio. **Risco:** baixo.
+**Effort:** low/medium. **Risk:** low.
 
-#### C3. Leitura do ACK sem timeout — **aplicado**
+#### C3. ACK read without timeout — **applied**
 
-**Onde:** `TcpLink.kt`, `send()`: `socket.getInputStream().read()` depois do envio.
+**Where:** `TcpLink.kt`, `send()`: `socket.getInputStream().read()` after sending.
 
-**Problema:** se o receptor cair, travar ou fechar sem enviar o ACK, o emissor fica bloqueado
-para sempre. O `Socket` não tem `soTimeout` para essa leitura.
+**Problem:** if the receiver crashes, hangs or closes without sending the ACK, the sender is blocked
+forever. The `Socket` has no `soTimeout` for that read.
 
-**Correção proposta:** `socket.soTimeout = 10_000` antes do ACK; em timeout, falhar com
-mensagem clara ("receptor não confirmou em 10 s").
+**Proposed fix:** `socket.soTimeout = 10_000` before the ACK; on timeout, fail with a clear
+message ("receiver did not confirm within 10 s").
 
-**Como testar:** teste de loopback em que o "receptor" aceita a conexão, lê os 16 MB e não
-responde; o emissor deve falhar em ~10 s, não travar.
+**How to test:** loopback test where the "receiver" accepts the connection, reads the 16 MB and does not
+respond; the sender must fail in ~10 s, not hang.
 
-**Esforço:** baixo. **Risco:** baixo.
+**Effort:** low. **Risk:** low.
 
-#### C4. `setupMs` final é o tempo total, não o setup — **aplicado**
+#### C4. Final `setupMs` is the total time, not the setup — **applied**
 
-**Onde:** `TcpLink.kt` (status final de `serve`/`send`) e `LanMode.kt` (status final de
+**Where:** `TcpLink.kt` (final status of `serve`/`send`) and `LanMode.kt` (final status of
 `sendPayload`/`receivePayload`).
 
-**Problema:** `startedAt` é marcado no início do servidor/envio; o status final usa
-`System.currentTimeMillis() - startedAt`, que inclui toda a transferência. A UI mostra esse
-valor ao lado do MB/s, então depois de uma transferência de 4 s o "setup" exibido é ~4 s.
+**Problem:** `startedAt` is set at the start of the server/send; the final status uses
+`System.currentTimeMillis() - startedAt`, which includes the entire transfer. The UI shows that
+value next to MB/s, so after a 4 s transfer the displayed "setup" is ~4 s.
 
-**Correção proposta:** guardar `setupMs` no momento da conexão e reutilizá-lo no status final;
-separar `setupMs` de `totalMs` no `LabStatus`.
+**Proposed fix:** store `setupMs` at connection time and reuse it in the final status;
+separate `setupMs` from `totalMs` in `LabStatus`.
 
-**Como testar:** teste unitário com relógio falso; conferir no aparelho que o valor final é o
-mesmo "TCP: conectado em Xms" do log.
+**How to test:** unit test with a fake clock; check on the device that the final value is the
+same "TCP: connected in X ms" from the log.
 
-**Esforço:** baixo. **Risco:** baixo.
+**Effort:** low. **Risk:** low.
 
-### 3.2 Prioridade média
+### 3.2 Medium priority
 
-#### C5. LAN e P2P medem coisas diferentes — **aplicado**
+#### C5. LAN and P2P measure different things — **applied**
 
-**Onde:** `LanMode.kt` vs `TcpLink.kt`; `app/src/main/java/dev/leandro/quicklydrop/diag/LanTransfer.kt`
-é uma terceira cópia.
+**Where:** `LanMode.kt` vs `TcpLink.kt`; `app/src/main/java/dev/leandro/quicklydrop/diag/LanTransfer.kt`
+is a third copy.
 
-**Problema:** `LanMode` não tem ACK, usa buffers padrão, tem um `Thread.sleep(500)` e calcula o
-tempo de envio sem esperar o receptor drenar. `TcpLink` tem ACK, buffers de 4 MB e nenhum
-sleep. Os números de LAN e P2P não são comparáveis, e o `LanTransfer` do diagnóstico repete a
-mesma lógica com outro tamanho de payload (32 MB).
+**Problem:** `LanMode` has no ACK, uses default buffers, has a `Thread.sleep(500)` and computes the
+send time without waiting for the receiver to drain. `TcpLink` has ACK, 4 MB buffers and no
+sleep. The LAN and P2P numbers are not comparable, and the diagnostic `LanTransfer` repeats the
+same logic with another payload size (32 MB).
 
-**Correção proposta:** um único `Transfer` (socket + ACK + medição + cancelamento), usado por
-LAN, hotspot e P2P. O `LanMode` passa a só descobrir e conectar; o `TcpLink` vira o transporte
-comum. O `LanTransfer` do diagnóstico pode ser removido ou passar a usar o mesmo código.
+**Proposed fix:** a single `Transfer` (socket + ACK + measurement + cancellation), used by
+LAN, hotspot and P2P. `LanMode` only discovers and connects; `TcpLink` becomes the common
+transport. The diagnostic `LanTransfer` can be removed or made to use the same code.
 
-**Como testar:** rodar LAN 3 vezes em cada direção antes/depois; comparar taxa do emissor e do
-receptor. Critério: as duas pontas ficam dentro de ~5% e o tempo de conclusão não piora.
+**How to test:** run LAN 3 times in each direction before/after; compare sender and
+receiver rates. Criterion: both ends stay within ~5% and the completion time does not get worse.
 
-**Esforço:** médio. **Risco:** baixo.
+**Effort:** medium. **Risk:** low.
 
-#### C6. Chips de modo/papel habilitados após erro, mas sem efeito — **aplicado**
+#### C6. Mode/role chips enabled after an error, but with no effect — **applied**
 
-**Onde:** `LabController.kt` (`selectMode`/`selectRole` só aceitam `Phase.IDLE`) e
-`MainActivity.kt` (`enabled = !running`, e `ERROR` não conta como "running").
+**Where:** `LabController.kt` (`selectMode`/`selectRole` only accept `Phase.IDLE`) and
+`MainActivity.kt` (`enabled = !running`, and `ERROR` does not count as "running").
 
-**Problema:** depois de um erro, os chips parecem clicáveis, mas o clique é ignorado. O usuário
-precisa descobrir sozinho que deve apertar "Parar" antes.
+**Problem:** after an error, the chips look clickable, but the click is ignored. The user
+has to figure out on their own that they must press "Stop" first.
 
-**Correção proposta:** aceitar seleção em `IDLE` ou `ERROR` (resetando o status para `IDLE`), ou
-desabilitar os chips em `ERROR` de forma explícita.
+**Proposed fix:** accept selection in `IDLE` or `ERROR` (resetting the status to `IDLE`), or
+explicitly disable the chips in `ERROR`.
 
-**Como testar:** teste unitário do `LabController` com um status em `ERROR`; clicar em outro
-modo deve refletir no estado.
+**How to test:** unit test of `LabController` with a status in `ERROR`; clicking another
+mode must be reflected in the state.
 
-**Esforço:** baixo. **Risco:** baixo.
+**Effort:** low. **Risk:** low.
 
-#### C7. `MainActivity` não para o controlador ao ser destruída — **aplicado**
+#### C7. `MainActivity` does not stop the controller when destroyed — **applied**
 
-**Onde:** `MainActivity.kt` — não há `onDestroy`.
+**Where:** `MainActivity.kt` — there is no `onDestroy`.
 
-**Problema:** sair do app (back) durante um teste deixa `Handler`, sockets, hotspot e grupo P2P
-vivos; o `LabController` segura a `Activity`. Em rotação/multiwindow, o vazamento se repete.
+**Problem:** leaving the app (back) during a test leaves `Handler`, sockets, hotspot and P2P group
+alive; `LabController` holds the `Activity`. On rotation/multiwindow, the leak repeats.
 
-**Correção proposta:** `onDestroy { controller.stop(quiet = true) }` ou mover o estado para um
-`ViewModel`/serviço. Para o lab, o `onDestroy` resolve.
+**Proposed fix:** `onDestroy { controller.stop(quiet = true) }` or move the state to a
+`ViewModel`/service. For the lab, `onDestroy` is enough.
 
-**Como testar:** iniciar P2P, apertar back, conferir `dumpsys wifip2p` e `ss -ltn` que o grupo e
-a porta sumiram.
+**How to test:** start P2P, press back, check `dumpsys wifip2p` and `ss -ltn` that the group and
+the port are gone.
 
-**Esforço:** baixo. **Risco:** baixo.
+**Effort:** low. **Risk:** low.
 
-#### C8. Senha do hotspot no log — **aplicado**
+#### C8. Hotspot password in the log — **applied**
 
-**Onde:** `HotspotLink.kt`: `LabLog.add("hotspot pronto ($ssid / $pass)")`.
+**Where:** `HotspotLink.kt`: `LabLog.add("hotspot ready ($ssid / $pass)")`.
 
-**Problema:** a senha vai para o logcat e para a tela. No laboratório é aceitável; no produto,
-não. O log também aparece em capturas de tela e relatórios de bug.
+**Problem:** the password goes to logcat and to the screen. In the lab it is acceptable; in the product,
+it is not. The log also shows up in screenshots and bug reports.
 
-**Correção proposta:** registrar só o SSID e mascarar a senha (`***`); se precisar depurar,
-usar `BuildConfig.DEBUG` e um canal separado.
+**Proposed fix:** log only the SSID and mask the password (`***`); if debugging is needed,
+use `BuildConfig.DEBUG` and a separate channel.
 
-**Como testar:** grep no logcat por "hotspot pronto" não deve conter a senha.
+**How to test:** grep the logcat for "hotspot ready" must not contain the password.
 
-**Esforço:** baixo. **Risco:** baixo.
+**Effort:** low. **Risk:** low.
 
-#### C9. Permissões pedidas em excesso no Android 13+ — **aplicado**
+#### C9. Permissions requested in excess on Android 13+ — **applied**
 
-**Onde:** `MainActivity.kt` (`requiredPermissions`).
+**Where:** `MainActivity.kt` (`requiredPermissions`).
 
-**Problema:** `ACCESS_FINE_LOCATION` é pedida mesmo em API 33+, onde P2P/BLE usam
-`NEARBY_WIFI_DEVICES` e `BLUETOOTH_SCAN` com `neverForLocation`. Isso gera um diálogo de
-localização desnecessário e assusta o usuário.
+**Problem:** `ACCESS_FINE_LOCATION` is requested even on API 33+, where P2P/BLE use
+`NEARBY_WIFI_DEVICES` and `BLUETOOTH_SCAN` with `neverForLocation`. This produces an unnecessary
+location dialog and scares the user.
 
-**Correção proposta:** pedir localização só em API < 33; em API 33+, pedir apenas as permissões
-"nearby". Testar em instalação limpa.
+**Proposed fix:** request location only on API < 33; on API 33+, request only the
+"nearby" permissions. Test on a clean install.
 
-**Como testar:** desinstalar, instalar, abrir e conferir quantos diálogos aparecem; o app deve
-funcionar sem localização em API 35.
+**How to test:** uninstall, install, open and check how many dialogs appear; the app must
+work without location on API 35.
 
-**Esforço:** baixo. **Risco:** baixo.
+**Effort:** low. **Risk:** low.
 
-#### C10. `WifiDirectMode` exige NFC mesmo quando o P2P não precisa — **pendente (produto)**
+#### C10. `WifiDirectMode` requires NFC even when P2P does not need it — **pending (product)**
 
-**Onde:** `WifiDirectMode.start()` chama `beam.problem()` e falha se o NFC estiver desligado.
+**Where:** `WifiDirectMode.start()` calls `beam.problem()` and fails if NFC is off.
 
-**Problema:** o Wi-Fi Direct funciona sem NFC; o lab só usa o toque como gatilho. Um aparelho
-sem NFC (ou com NFC desligado) não consegue testar o P2P.
+**Problem:** Wi-Fi Direct works without NFC; the lab only uses the tap as a trigger. A device
+without NFC (or with NFC off) cannot test P2P.
 
-**Correção proposta:** permitir gatilho alternativo (BLE, QR ou botão "conectar ao último
-peer") para o P2P. Para o produto, o NFC é o atalho premium, não o único caminho.
+**Proposed fix:** allow an alternative trigger (BLE, QR or a "connect to the last
+peer" button) for P2P. For the product, NFC is the premium shortcut, not the only path.
 
-**Como testar:** desligar NFC, iniciar P2P pelo gatilho alternativo e medir o setup.
+**How to test:** turn NFC off, start P2P through the alternative trigger and measure the setup.
 
-**Esforço:** médio. **Risco:** baixo.
+**Effort:** medium. **Risk:** low.
 
-#### C11. Grupo velho pode sobreviver se `removeGroup` falhar — **aplicado**
+#### C11. Stale group can survive if `removeGroup` fails — **applied**
 
-**Onde:** `WifiDirectMode.stop()` e `LabController.stop()`.
+**Where:** `WifiDirectMode.stop()` and `LabController.stop()`.
 
-**Problema:** `P2pCleanup` só é chamado quando não há `WifiDirectMode` em memória. Se o
-`removeGroup` do modo falhar (framework ocupado), o grupo fica e a próxima execução pode
-formar outro grupo.
+**Problem:** `P2pCleanup` is only called when there is no `WifiDirectMode` in memory. If the
+mode's `removeGroup` fails (framework busy), the group remains and the next run may
+form another group.
 
-**Correção proposta:** sempre agendar `P2pCleanup` como fallback depois do `stop`, com timeout;
-ou repetir `removeGroup` com backoff em caso de `BUSY`.
+**Proposed fix:** always schedule `P2pCleanup` as a fallback after `stop`, with a timeout;
+or retry `removeGroup` with backoff on `BUSY`.
 
-**Como testar:** forçar um grupo e matar o app; reiniciar e conferir que só existe um grupo e
-que o TCP conecta no dono certo.
+**How to test:** force a group and kill the app; restart and check that only one group exists and
+that TCP connects to the right owner.
 
-**Esforço:** baixo/médio. **Risco:** baixo.
+**Effort:** low/medium. **Risk:** low.
 
-#### C12. Documentação desatualizada — **aplicado**
+#### C12. Outdated documentation — **applied**
 
-**Onde:** `PLANO.md` e `README.md`.
+**Where:** `PLANO.md` and `README.md`.
 
-**Problemas concretos:**
+**Concrete problems:**
 
-- `PLANO.md` ainda diz "Nada foi implementado ainda. Nenhum repositório foi criado."
-- `PLANO.md` §5.3 diz que "o emissor sobe um LocalOnlyHotspot", mas a medição mostrou que quem
-  recebe deve hospedar.
-- `PLANO.md` §6 (Fase 1) trata Wi-Fi Direct como fallback, enquanto §11 o coloca como principal.
-- `PLANO.md` §10 fala em "antes de criar o repositório", que já existe.
-- `README.md` ainda mostra P2P com "3,8–4,8 s" e "5–14,5 MB/s", números do caminho antigo; o
-  caminho rápido está em ~0,86 s e 35–48 MB/s.
-- `README.md` e `PLANO.md` não registram o experimento de 2,4 GHz (já documentado em §11, mas o
-  README não aponta para ele).
+- `PLANO.md` still says "Nothing has been implemented yet. No repository has been created."
+- `PLANO.md` §5.3 says that "the sender brings up a LocalOnlyHotspot", but the measurement showed that the
+  receiver should host.
+- `PLANO.md` §6 (Phase 1) treats Wi-Fi Direct as a fallback, while §11 places it as primary.
+- `PLANO.md` §10 talks about "before creating the repository", which already exists.
+- `README.md` still shows P2P with "3.8–4.8 s" and "5–14.5 MB/s", numbers from the old path; the
+  fast path is at ~0.86 s and 35–48 MB/s.
+- `README.md` and `PLANO.md` do not record the 2.4 GHz experiment (already documented in §11, but the
+  README does not point to it).
 
-**Correção proposta:** atualizar os dois documentos e adicionar um "Estado atual" com data,
-números e link para este arquivo. É barato e evita decisões baseadas em dados velhos.
+**Proposed fix:** update both documents and add a "Current state" with date,
+numbers and a link to this file. It is cheap and avoids decisions based on stale data.
 
-**Resultado:** `PLANO.md` e `README.md` foram atualizados com as medições de 01/11/2026 e o
-`README.md` aponta para este documento.
+**Result:** `PLANO.md` and `README.md` were updated with the 01/11/2026 measurements and
+`README.md` points to this document.
 
-**Esforço:** baixo. **Risco:** nenhum.
+**Effort:** low. **Risk:** none.
 
-### 3.3 Menores, mas vale anotar
+### 3.3 Minor, but worth noting
 
-| ID | Onde | Problema | Correção |
+| ID | Where | Problem | Fix |
 |---|---|---|---|
-| C13 | `TcpLink.send` | ~~`sendBufferSize`/`receiveBufferSize` fora de `runCatching`~~ — **aplicado** | buffers agora em `runCatching` |
-| C14 | `TcpLink` | ~~`server` e `startedAt` sem `@Volatile`~~ — **aplicado** | campos anotados com `@Volatile` |
-| C15 | `LabScreen` | `LaunchedEffect(lines.size)` para de rolar quando o log bate em 400 linhas | usar a última linha ou um contador monotônico |
-| C16 | `BleMode` | `onCharacteristicReadRequest` ignora `offset` e o MTU; payload maior que o MTU quebra | responder a partir do offset e truncar no MTU |
-| C17 | `BleMode` | escolhe o primeiro anúncio acima do limiar, não o mais forte | janela de 1–2 s + escolher o maior RSSI |
-| C18 | `LanMode` | `resolveService` concorrente pode dar `FAILURE_ALREADY_ACTIVE` (o timeout de conexão já foi resolvido pelo `TcpLink`) | serializar resolves com retry |
-| C19 | `NfcBeam.present` | não confere se o NFC continua ligado; falha silenciosa | checar `nfc.isEnabled` e reportar |
-| C20 | `QuicklyDropApduService` | resposta HCE curta limita o payload a ~255 bytes; sem chunking | definir limite e, se crescer, usar APDU estendida/chunking |
-| C21 | `NfcMode`/`WifiDirectMode`/`BleMode` | payload delimitado por `\n`; SSID/nome com newline quebra o parsing | codec binário/TLV com tamanho por campo (ver §4) |
-| C22 | `LabLog` | cada linha copia a lista inteira (`it + line`); em rajada, aloca muito | `ArrayDeque` + snapshot ou lote de linhas |
-| C23 | `P2pConfigTest` | o teste de frequência funciona porque a API 35 grava a frequência em `groupOwnerBand`; é frágil | manter, mas adicionar um teste de `toString`/reflexão e revisar ao subir o SDK |
+| C13 | `TcpLink.send` | ~~`sendBufferSize`/`receiveBufferSize` outside `runCatching`~~ — **applied** | buffers now inside `runCatching` |
+| C14 | `TcpLink` | ~~`server` and `startedAt` without `@Volatile`~~ — **applied** | fields annotated with `@Volatile` |
+| C15 | `LabScreen` | `LaunchedEffect(lines.size)` stops scrolling when the log reaches 400 lines | use the last line or a monotonic counter |
+| C16 | `BleMode` | `onCharacteristicReadRequest` ignores `offset` and the MTU; a payload larger than the MTU breaks | respond from the offset and truncate at the MTU |
+| C17 | `BleMode` | picks the first advertisement above the threshold, not the strongest | 1–2 s window + pick the highest RSSI |
+| C18 | `LanMode` | concurrent `resolveService` can return `FAILURE_ALREADY_ACTIVE` (the connection timeout was already fixed by `TcpLink`) | serialize resolves with retry |
+| C19 | `NfcBeam.present` | does not check whether NFC is still on; silent failure | check `nfc.isEnabled` and report |
+| C20 | `QuicklyDropApduService` | short HCE response limits the payload to ~255 bytes; no chunking | define a limit and, if it grows, use extended APDU/chunking |
+| C21 | `NfcMode`/`WifiDirectMode`/`BleMode` | payload delimited by `\n`; an SSID/name with a newline breaks parsing | binary/TLV codec with per-field length (see §4) |
+| C22 | `LabLog` | each line copies the entire list (`it + line`); under bursts, it allocates a lot | `ArrayDeque` + snapshot or line batching |
+| C23 | `P2pConfigTest` | the frequency test works because API 35 writes the frequency into `groupOwnerBand`; it is fragile | keep it, but add a `toString`/reflection test and review when raising the SDK |
 
 ---
 
-## 4. Estrutura: o lab precisa usar o código do produto
+## 4. Structure: the lab must use the product code
 
-Hoje existem **duas** implementações de transferência:
+Today there are **two** transfer implementations:
 
-- `lab/TcpLink.kt` (LAN, P2P e hotspot, com ACK, timeouts e cancelamento);
-- `app/diag/LanTransfer.kt` (diagnóstico, 32 MB, outra cópia).
+- `lab/TcpLink.kt` (LAN, P2P and hotspot, with ACK, timeouts and cancellation);
+- `app/diag/LanTransfer.kt` (diagnostic, 32 MB, another copy).
 
-E **três** parsers de credenciais:
+And **three** credential parsers:
 
 - `BleMode` (`ssid\npass`);
 - `NfcMode` (`ssid\npass`);
 - `WifiDirectMode` (`name\nssid\npass\nfrequency`).
 
-Isso significa que "o lab validou" não é o mesmo que "o produto vai se comportar assim". A
-recomendação é extrair o núcleo compartilhado **quando o MVP começar**, sem criar dez módulos
-agora:
+This means that "the lab validated it" is not the same as "the product will behave like this". The
+recommendation is to extract the shared core **when the MVP starts**, without creating ten modules
+now:
 
 ```
-:core:protocol   payload NFC/BLE, framing TCP, manifesto, hash (Kotlin puro, testável em JVM)
-:core:transport  P2P, LAN, hotspot, transferência, cancelamento
+:core:protocol   NFC/BLE payload, TCP framing, manifest, hash (pure Kotlin, testable on JVM)
+:core:transport  P2P, LAN, hotspot, transfer, cancellation
 :core:crypto     X25519/HKDF/AEAD/SAS (Tink)
-:lab             UI de teste, consumindo :core:transport
-:app             produto: share sheet, serviço, MediaStore, UI
+:lab             test UI, consuming :core:transport
+:app             product: share sheet, service, MediaStore, UI
 ```
 
-Vantagens:
+Advantages:
 
-- o lab mede exatamente o código que o produto usa;
-- um bug corrigido no transporte vale para todos os modos;
-- os testes de protocolo rodam em JVM, sem aparelho;
-- o `:lab` pode continuar sendo um app separado, mas fino.
+- the lab measures exactly the code the product uses;
+- a bug fixed in the transport applies to all modes;
+- protocol tests run on the JVM, without a device;
+- `:lab` can remain a separate app, but a thin one.
 
-Não vale a pena dividir tudo antes do MVP. Comece por `:core:protocol` (puro) e
-`:core:transport` (P2P + TCP). O `:app` de diagnóstico pode ser aposentado ou virar
-`:tools:diag` quando o produto nascer.
+Splitting everything before the MVP is not worth it. Start with `:core:protocol` (pure) and
+`:core:transport` (P2P + TCP). The diagnostic `:app` can be retired or become
+`:tools:diag` when the product is born.
 
-### Codec de payload
+### Payload codec
 
-Proposta de formato binário versionado, em vez de linhas:
+Proposal for a versioned binary format, instead of lines:
 
 ```
-magic "EDP1" | versão (1 byte) | tipo (1 byte)
-campo: tamanho (2 bytes) + UTF-8/bytes
+magic "EDP1" | version (1 byte) | type (1 byte)
+field: size (2 bytes) + UTF-8/bytes
 ...
 ```
 
-Campos: `name`, `ssid`, `pass`, `frequency`, `token` (opcional, para o produto). Vantagens:
-aceita SSID com caracteres arbitrários, tem limite explícito, permite evoluir sem quebrar o
-outro lado e é trivial de testar. O mesmo codec serve NFC, BLE e QR.
+Fields: `name`, `ssid`, `pass`, `frequency`, `token` (optional, for the product). Advantages:
+it accepts SSIDs with arbitrary characters, has an explicit limit, allows evolving without breaking
+the other side and is trivial to test. The same codec serves NFC, BLE and QR.
 
-### Framing TCP
+### TCP framing
 
-Para o produto, o `TcpLink` de 16 MB fixos vira um protocolo com:
+For the product, the fixed 16 MB `TcpLink` becomes a protocol with:
 
-- `HELLO` (versão, capabilities);
-- `MANIFEST` (quantidade de arquivos, nome, tamanho, MIME, SHA-256);
-- `CHUNK` (offset/sequência + bytes);
-- `ACK` (janela/offset);
+- `HELLO` (version, capabilities);
+- `MANIFEST` (number of files, name, size, MIME, SHA-256);
+- `CHUNK` (offset/sequence + bytes);
+- `ACK` (window/offset);
 - `DONE`/`ERROR`;
-- retomada por offset e hash por arquivo.
+- resume by offset and per-file hash.
 
-Testar o codec em JVM com `PipedInputStream`/`PipedOutputStream` ou sockets de loopback.
+Test the codec on the JVM with `PipedInputStream`/`PipedOutputStream` or loopback sockets.
 
 ---
 
-## 5. Otimizações e experimentos
+## 5. Optimizations and experiments
 
-### 5.1 Primeiro, o harness
+### 5.1 First, the harness
 
-Sem uma medição repetível, cada otimização vira opinião. A rodada de 01/11/2026 usou scripts
-ad hoc de `adb`; o harness versionado continua sendo o próximo passo. Proposta:
+Without repeatable measurement, every optimization becomes opinion. The 01/11/2026 round used ad
+hoc `adb` scripts; the versioned harness remains the next step. Proposal:
 
-- o lab aceita `--es runId <id>` e `--es payloadMB <n>` e emite uma linha JSON por execução:
+- the lab accepts `--es runId <id>` and `--es payloadMB <n>` and emits one JSON line per run:
   `BENCH {"runId":...,"mode":"P2P","role":"SENDER","setupMs":...,"mbps":...,"groupMhz":...}`;
-- um script `scripts/bench.sh` roda N iterações por direção, limpa o logcat, troca os papéis,
-  coleta os JSONs e gera CSV com mediana e p95;
-- o CSV guarda também `sta_band`, `group_mhz`, temperatura e versão do app;
-- resultados ficam em `bench/results/` (resumos versionados; logs brutos ignorados).
+- a `scripts/bench.sh` script runs N iterations per direction, clears logcat, swaps the roles,
+  collects the JSONs and generates a CSV with median and p95;
+- the CSV also stores `sta_band`, `group_mhz`, temperature and app version;
+- results live in `bench/results/` (versioned summaries; raw logs ignored).
 
-Comandos úteis para acompanhar:
+Useful commands to follow along:
 
 ```bash
 adb shell cmd wifi status
@@ -421,241 +423,241 @@ adb shell dumpsys thermalservice | grep -i -E "status|temperature"
 adb shell dumpsys batterystats --charged | grep -i quicklydrop
 ```
 
-### 5.2 Tabela de experimentos
+### 5.2 Experiment table
 
-| ID | Hipótese | Como medir | Critério para aceitar | Esforço |
+| ID | Hypothesis | How to measure | Criterion to accept | Effort |
 |---|---|---|---|---|
-| E1 | Com `WAKE_LOCK`, o hotspot melhora e o lock realmente atua | 3 runs/direção antes/depois; `dumpsys wifi` | +15% de taxa ou `mPowerSaveDisableRequests` > 0 | S |
-| E2 | Fechar o socket ativo torna o "Parar" imediato | parar no meio, reiniciar 5x | parada < 1 s, sem porta presa | S |
-| E3 | Separar `setupMs` de `totalMs` corrige a leitura | teste com relógio falso + 3 runs | setup final = "conectado em Xms" | S |
-| E4 | Unificar LAN no `TcpLink` iguala as pontas | 3 runs LAN/direção | emissor e receptor dentro de 5% | M |
-| E5 | Broadcasts do P2P reduzem o setup vs polling de 500 ms | 10 runs/direção | mediana < 1,0 s e p95 melhor | M |
-| E6 | Zero-copy (`FileChannel.transferTo`) ajuda em arquivo real | 1 GB sintético vs arquivo real | +10% sem regressão | M |
-| E7 | Buffer de socket 8 MB melhora o throughput | 1/4/8 MB, 3 runs cada | +10% | S |
-| E8 | 16 MB esconde throttling térmico | 4 GB contínuos, taxa a cada 10 s | taxa estável > 15 MB/s | M |
-| E9 | Grupo P2P persistente reduz o setup | pré-criar grupo, 10 toques | setup < 0,5 s sem falhas | M |
-| E10 | Dois fluxos TCP ajudam em muitos arquivos | 1 vs 2 vs 4 fluxos | +15% no total | M |
-| E11 | Canal 36/44 rende mais que 149 no ambiente | 3 runs por canal | diferença > 10% | M |
-| E12 | Escolher o peer mais forte evita conexão errada | 3 aparelhos, 20 runs | 0 conexões erradas | M |
-| E13 | P2P sem NFC amplia o alcance | NFC desligado, gatilho BLE/QR | toque/BLE → TCP < 2 s | M |
-| E14 | Receber em background funciona com foreground service | tela apagada, app em background | > 90% de sucesso | L |
-| E15 | Criptografia custa pouco | handshake + 1 GB, AES-GCM vs ChaCha20 | < 100 ms de setup, sem queda de taxa | L |
-| E16 | Um emissor serve dois receptores | 3 aparelhos, 1→2 | ambos concluem; medir queda | M |
-| E17 | Target SDK 36/37 não quebra o app | subir e rodar a matriz | sem crash, permissões corretas | M |
-| E18 | CI pega regressões | GitHub Actions com build + testes + lint | pipeline verde | S |
-| E19 | Interop Quick Share é viável | spike com Bada/NearDrop | enviar para o Edge sem GMS | L |
+| E1 | With `WAKE_LOCK`, the hotspot improves and the lock actually acts | 3 runs/direction before/after; `dumpsys wifi` | +15% rate or `mPowerSaveDisableRequests` > 0 | S |
+| E2 | Closing the active socket makes "Stop" immediate | stop mid-transfer, restart 5x | stop < 1 s, no stuck port | S |
+| E3 | Separating `setupMs` from `totalMs` fixes the reading | fake-clock test + 3 runs | final setup = "connected in X ms" | S |
+| E4 | Unifying LAN on `TcpLink` equalizes both ends | 3 LAN runs/direction | sender and receiver within 5% | M |
+| E5 | P2P broadcasts reduce setup vs 500 ms polling | 10 runs/direction | median < 1.0 s and better p95 | M |
+| E6 | Zero-copy (`FileChannel.transferTo`) helps with a real file | 1 GB synthetic vs real file | +10% with no regression | M |
+| E7 | 8 MB socket buffer improves throughput | 1/4/8 MB, 3 runs each | +10% | S |
+| E8 | 16 MB hides thermal throttling | 4 GB continuous, rate every 10 s | stable rate > 15 MB/s | M |
+| E9 | Persistent P2P group reduces setup | pre-create group, 10 taps | setup < 0.5 s without failures | M |
+| E10 | Two TCP streams help with many files | 1 vs 2 vs 4 streams | +15% total | M |
+| E11 | Channel 36/44 yields more than 149 in the environment | 3 runs per channel | difference > 10% | M |
+| E12 | Choosing the strongest peer avoids wrong connections | 3 devices, 20 runs | 0 wrong connections | M |
+| E13 | P2P without NFC broadens reach | NFC off, BLE/QR trigger | tap/BLE → TCP < 2 s | M |
+| E14 | Receiving in the background works with a foreground service | screen off, app in background | > 90% success | L |
+| E15 | Encryption costs little | handshake + 1 GB, AES-GCM vs ChaCha20 | < 100 ms setup, no rate drop | L |
+| E16 | One sender serves two receivers | 3 devices, 1→2 | both complete; measure the drop | M |
+| E17 | Target SDK 36/37 does not break the app | bump and run the matrix | no crash, correct permissions | M |
+| E18 | CI catches regressions | GitHub Actions with build + tests + lint | green pipeline | S |
+| E19 | Quick Share interop is viable | spike with Bada/NearDrop | send to the Edge without GMS | L |
 
-**Resultado:** E1 manteve a correção sem ganho de taxa (11,6 vs 11,5 MB/s); E2, E3, E4 e E5
-foram aceitos; E7 foi rejeitado (40,0 vs 46,7 MB/s com 8 MB); E11 foi rejeitado (o Edge recusa
-5180 MHz e o automático escolhe 5745). O detalhe está na seção 1.1.
+**Result:** E1 kept the fix with no rate gain (11.6 vs 11.5 MB/s); E2, E3, E4 and E5
+were accepted; E7 was rejected (40.0 vs 46.7 MB/s with 8 MB); E11 was rejected (the Edge refuses
+5180 MHz and automatic picks 5745). Details are in section 1.1.
 
-### 5.3 Detalhes dos experimentos que eu faria primeiro
+### 5.3 Details of the experiments I would run first
 
-**E1 — `WAKE_LOCK` no hotspot.** É o de maior alavancagem porque pode invalidar uma conclusão
-do plano. Rode o hotspot com a permissão e o log corrigido; veja se
-`mPowerSaveDisableRequests` sai de 0 e se a taxa sobe. Se subir, o hotspot deixa de ser apenas
-reserva e a decisão de transporte precisa ser revista com números novos.
+**E1 — `WAKE_LOCK` on the hotspot.** It has the highest leverage because it can invalidate a
+conclusion from the plan. Run the hotspot with the permission and the fixed log; see whether
+`mPowerSaveDisableRequests` moves from 0 and whether the rate rises. If it does, the hotspot stops being just a
+backup and the transport decision must be reviewed with new numbers.
 
-**E5 — broadcasts no P2P.** Hoje o emissor faz `requestConnectionInfo` a cada 500 ms e
-`requestPeers` a cada 500 ms. Um `BroadcastReceiver` para `WIFI_P2P_CONNECTION_CHANGED_ACTION`
-e `WIFI_P2P_PEERS_CHANGED_ACTION` tende a reagir mais rápido e gastar menos. Meça o setup em 10
-execuções; se a mediana cair 100–300 ms, vale.
+**E5 — broadcasts in P2P.** Today the sender calls `requestConnectionInfo` every 500 ms and
+`requestPeers` every 500 ms. A `BroadcastReceiver` for `WIFI_P2P_CONNECTION_CHANGED_ACTION`
+and `WIFI_P2P_PEERS_CHANGED_ACTION` tends to react faster and spend less. Measure the setup across 10
+runs; if the median drops 100–300 ms, it is worth it.
 
-**E6/E7/E8 — throughput real.** Os 35–48 MB/s atuais são com 16 MB e sem gravar em disco. O
-número que importa é arquivo real de 1–4 GB, com gravação em `MediaStore`, tela apagada e
-transferência contínua. Antes de otimizar, descubra o teto real. Teste `FileChannel.transferTo`,
-buffer de 1 MB e socket de 8 MB; se nada mudar, o limite é o rádio ou o armazenamento, e não o
-código.
+**E6/E7/E8 — real throughput.** The current 35–48 MB/s are with 16 MB and no disk write. The
+number that matters is a real 1–4 GB file, with writing to `MediaStore`, screen off and
+continuous transfer. Before optimizing, find the real ceiling. Test `FileChannel.transferTo`,
+a 1 MB buffer and an 8 MB socket; if nothing changes, the limit is the radio or the storage, not the
+code.
 
-**E9 — grupo persistente.** O setup de ~0,86 s é dominado pela formação do grupo. Manter o grupo
-vivo entre transferências pode derrubar para <0,5 s, mas custa bateria, exposição e o risco de
-grupo velho. Teste com um grupo pré-criado e 10 toques; decida com dados de bateria e falhas.
+**E9 — persistent group.** The ~0.86 s setup is dominated by group formation. Keeping the group
+alive between transfers may bring it down to <0.5 s, but it costs battery, exposure and the risk of a
+stale group. Test with a pre-created group and 10 taps; decide with battery and failure data.
 
-**E13 — P2P sem NFC.** O NFC é ótimo, mas não existe em todos os aparelhos e pode estar
-desligado. Um gatilho BLE (anúncio + GATT) ou QR mantém o P2P utilizável. Meça o setup e a
-taxa de acerto.
+**E13 — P2P without NFC.** NFC is great, but it does not exist on every device and can be
+off. A BLE trigger (advertisement + GATT) or QR keeps P2P usable. Measure the setup and the
+hit rate.
 
-**E14 — background.** O lab mantém a tela ligada; o produto precisa receber com o app em
-background e a tela apagada. Foreground service com tipo `connectedDevice`/`dataSync`,
-notificação, `WifiLock` e testes com battery saver/Doze nos dois aparelhos. É o experimento
-que mais expõe fragmentação de OEM.
+**E14 — background.** The lab keeps the screen on; the product must receive with the app in the
+background and the screen off. Foreground service with type `connectedDevice`/`dataSync`,
+notification, `WifiLock` and tests with battery saver/Doze on both devices. It is the experiment
+that most exposes OEM fragmentation.
 
-**E15 — criptografia.** Antes de qualquer uso externo, handshake X25519 + HKDF + AEAD + SAS.
-Meça o custo no setup e no throughput; se o AEAD custar >10%, teste AES-GCM com aceleração de
-hardware contra ChaCha20-Poly1305. Não invente criptografia: use Tink (Apache 2.0, compatível
-com GPL-3.0).
+**E15 — encryption.** Before any external use, X25519 + HKDF + AEAD + SAS handshake.
+Measure the cost in setup and throughput; if AEAD costs >10%, test AES-GCM with hardware
+acceleration against ChaCha20-Poly1305. Do not roll your own crypto: use Tink (Apache 2.0, compatible
+with GPL-3.0).
 
 ---
 
-## 6. Próximos passos de produto
+## 6. Product next steps
 
-### 6.1 Ordem recomendada
+### 6.1 Recommended order
 
-1. **Harness + correções baratas** (C1–C9, C12). Uma a duas semanas de trabalho, mas destrava
-   todas as decisões seguintes.
-2. **Protocolo + codec + testes** (`:core:protocol`). Payload versionado, framing, manifesto,
-   hash. Sem UI.
-3. **MVP de arquivo real.** Share sheet → P2P → `MediaStore/Downloads/QuicklyDrop`, progresso,
-   cancelamento, hash, nome duplicado. Primeiro marco que um humano consegue usar.
-4. **Criptografia + SAS.** Handshake, chave de sessão, confirmação; NFC como prova de presença.
-5. **Foreground service + background.** Receber com tela apagada; notificação; cancelar;
-   sobreviver a Doze/battery saver.
-6. **Proximidade e atalhos.** Card por RSSI com histerese, NFC tap, QR fallback, tile de
-   configurações rápidas.
-7. **Performance e robustez.** Zero-copy, 4 GB, retomada, multi-arquivo, multi-receptor.
-8. **Polimento e distribuição.** Ícone, tema, acessibilidade, assinatura, R8, CI, F-Droid.
+1. **Harness + cheap fixes** (C1–C9, C12). One to two weeks of work, but it unlocks
+   all subsequent decisions.
+2. **Protocol + codec + tests** (`:core:protocol`). Versioned payload, framing, manifest,
+   hash. No UI.
+3. **Real-file MVP.** Share sheet → P2P → `MediaStore/Downloads/QuicklyDrop`, progress,
+   cancellation, hash, duplicate name. First milestone a human can use.
+4. **Encryption + SAS.** Handshake, session key, confirmation; NFC as proof of presence.
+5. **Foreground service + background.** Receive with the screen off; notification; cancel;
+   survive Doze/battery saver.
+6. **Proximity and shortcuts.** Card per RSSI with hysteresis, NFC tap, QR fallback, quick
+   settings tile.
+7. **Performance and robustness.** Zero-copy, 4 GB, resume, multi-file, multi-receiver.
+8. **Polish and distribution.** Icon, theme, accessibility, signing, R8, CI, F-Droid.
 
-### 6.2 MVP — o que entra e o que fica de fora
+### 6.2 MVP — what is in and what is out
 
-**Entra:**
+**In:**
 
-- compartilhar 1..N arquivos pelo share sheet do Android;
-- receber via P2P (receptor hospeda), com o toque NFC como gatilho;
-- progresso, cancelar, erro claro;
-- gravar em `Downloads/QuicklyDrop/` via MediaStore, com `.part` e rename no fim;
-- SHA-256 por arquivo e verificação no receptor;
-- tela de recebimento com "Aceitar/Recusar" (a confirmação explícita continua obrigatória).
+- share 1..N files through the Android share sheet;
+- receive via P2P (receiver hosts), with the NFC tap as trigger;
+- progress, cancel, clear error;
+- write to `Downloads/QuicklyDrop/` via MediaStore, with `.part` and rename at the end;
+- SHA-256 per file and verification on the receiver;
+- receive screen with "Accept/Decline" (explicit confirmation remains mandatory).
 
-**Fica de fora do primeiro MVP:**
+**Out of the first MVP:**
 
-- hotspot como fallback (só depois de E1);
+- hotspot as fallback (only after E1);
 - LAN/mDNS;
 - QR;
-- múltiplos receptores;
-- retomada entre reinícios;
+- multiple receivers;
+- resume across restarts;
 - Quick Share;
 - UWB/Aware.
 
-### 6.3 Segurança — desenho mínimo
+### 6.3 Security — minimum design
 
-- X25519 efêmero dos dois lados; HKDF-SHA256 para derivar a chave de sessão;
-- AEAD (AES-GCM ou ChaCha20-Poly1305) em todos os frames;
-- SAS de 6 dígitos derivado do transcript; os dois lados comparam;
-- NFC carrega um token de uso único que entra no HKDF (prova de presença física);
-- grupo P2P com senha aleatória por sessão; fechar o grupo depois da transferência;
-- nunca logar senha, token ou chave;
-- ameaças: eavesdropper passivo, MITM ativo, replay, dispositivo malicioso próximo. WPA2 do P2P
-  protege o link, mas não substitui a autenticação da aplicação.
+- ephemeral X25519 on both sides; HKDF-SHA256 to derive the session key;
+- AEAD (AES-GCM or ChaCha20-Poly1305) on all frames;
+- 6-digit SAS derived from the transcript; both sides compare;
+- NFC carries a single-use token that enters HKDF (proof of physical presence);
+- P2P group with a random password per session; close the group after the transfer;
+- never log password, token or key;
+- threats: passive eavesdropper, active MITM, replay, malicious device nearby. P2P WPA2
+  protects the link, but does not replace application authentication.
 
-### 6.4 Background — o que testar
+### 6.4 Background — what to test
 
-- foreground service com `connectedDevice` + `dataSync` e notificação;
-- permissões `FOREGROUND_SERVICE`, `FOREGROUND_SERVICE_CONNECTED_DEVICE`,
+- foreground service with `connectedDevice` + `dataSync` and notification;
+- permissions `FOREGROUND_SERVICE`, `FOREGROUND_SERVICE_CONNECTED_DEVICE`,
   `FOREGROUND_SERVICE_DATA_SYNC`, `POST_NOTIFICATIONS`;
-- `WifiLock` (com `WAKE_LOCK`) durante a transferência;
-- tela apagada, app em background, battery saver, Doze, restrições de OEM;
-- cancelamento pela notificação;
-- processo morto no meio: o que acontece com o `.part` e com o grupo P2P.
+- `WifiLock` (with `WAKE_LOCK`) during the transfer;
+- screen off, app in background, battery saver, Doze, OEM restrictions;
+- cancellation from the notification;
+- process killed mid-transfer: what happens to the `.part` and to the P2P group.
 
-### 6.5 Proximidade — o que testar
+### 6.5 Proximity — what to test
 
-- RSSI BLE com média móvel e histerese (mostra em > −60 dBm, esconde em < −70 dBm);
-- distâncias de 0,2 / 1 / 3 / 10 m, com o aparelho no bolso e na mão;
-- múltiplos aparelhos: ordenar por RSSI e nunca conectar no primeiro que aparecer;
-- NFC: posição da antena varia muito; mostrar dica visual e ter QR como plano B;
-- UWB: opcional, requer hardware compatível nos dois lados;
-- Wi-Fi Aware: opcional, requer hardware que exponha o serviço nos dois lados.
+- BLE RSSI with moving average and hysteresis (show above −60 dBm, hide below −70 dBm);
+- distances of 0.2 / 1 / 3 / 10 m, with the device in the pocket and in the hand;
+- multiple devices: sort by RSSI and never connect to the first one that appears;
+- NFC: antenna position varies a lot; show a visual hint and have QR as a plan B;
+- UWB: optional, requires compatible hardware on both sides;
+- Wi-Fi Aware: optional, requires hardware that exposes the service on both sides.
 
-### 6.6 Performance — o que medir de verdade
+### 6.6 Performance — what to actually measure
 
-- 1 KB, 10 MB, 1 GB e 4 GB; 1 e 200 arquivos; pasta;
-- throughput no emissor e no receptor, setup, total, CPU, bateria e temperatura;
-- gravação em `MediaStore` vs arquivo direto;
-- tela apagada e app em background;
-- cancelar no meio e retomar;
-- Wi-Fi STA em 2,4 GHz e 5 GHz nos dois aparelhos;
-- canal do grupo (149 vs 36/44) e largura de banda;
-- 1 vs 2 vs 4 fluxos TCP;
-- hash no fim: quanto custa em 4 GB.
+- 1 KB, 10 MB, 1 GB and 4 GB; 1 and 200 files; folder;
+- throughput on the sender and the receiver, setup, total, CPU, battery and temperature;
+- writing to `MediaStore` vs direct file;
+- screen off and app in background;
+- cancel mid-transfer and resume;
+- Wi-Fi STA at 2.4 GHz and 5 GHz on both devices;
+- group channel (149 vs 36/44) and bandwidth;
+- 1 vs 2 vs 4 TCP streams;
+- hash at the end: how much it costs on 4 GB.
 
-### 6.7 Distribuição
+### 6.7 Distribution
 
-- assinatura de release com keystore fora do repositório;
-- R8/minify e teste do APK de release;
-- CI com build + testes + lint;
-- F-Droid é um bom alvo (GPL-3.0, sem GMS, sem nuvem);
-- política de privacidade curta: nada sai do aparelho;
-- avisos de licença de terceiros (Tink etc.);
-- ícone, tema, acessibilidade e textos em pt-BR/en.
-
----
-
-## 7. Ideias interessantes para depois
-
-- **Token de uso único no NFC.** Em vez de publicar SSID/senha estáticos, publicar um token que
-  o receptor valida e queima. O toque vira uma chave física de sessão.
-- **Dispositivos confiáveis.** Guardar a chave pública do outro aparelho no Keystore e pular a
-  confirmação nas próximas transferências, mantendo a criptografia.
-- **Receber sem abrir o app.** Tile de configurações rápidas + foreground service + HCE; o
-  usuário só encosta e o card aparece.
-- **Share sheet direto.** `ACTION_SEND`/`ACTION_SEND_MULTIPLE` com `ClipData` e permissões
-  temporárias; o QuicklyDrop aparece como destino sem abrir o app.
-- **Um para muitos.** O grupo P2P aceita mais de um cliente; testar 1 emissor → 2 receptores,
-  com taxa por receptor.
-- **Retomada de verdade.** Manifesto + offset persistido; se o app morrer, continua do ponto
-  onde parou.
-- **Texto/links pelo BLE.** Para payloads pequenos, nem precisa subir Wi-Fi; útil para
-  clipboard e links.
-- **QR como fallback universal.** Quando NFC/BLE falham, o receptor mostra um QR com o token;
-  o emissor lê e entra.
-- **Canal do grupo inteligente.** Medir ocupação dos canais 5 GHz e escolher o menos congestionado
-  (exige localização; testar o custo de UX).
-- **UWB.** "Apontar e compartilhar" com ranging de centímetros; opcional, quando houver hardware.
-- **Wi-Fi Aware.** Descoberta + ranging sem infraestrutura; opcional, quando os dois aparelhos
-  expuserem o serviço.
-- **Histórico com retry.** Lista de transferências, reenviar, abrir pasta, compartilhar de novo.
-- **Modo "só receber".** Deixar o aparelho visível por X minutos, com notificação e botão de
-  parar.
+- release signing with a keystore outside the repository;
+- R8/minify and testing the release APK;
+- CI with build + tests + lint;
+- F-Droid is a good target (GPL-3.0, no GMS, no cloud);
+- short privacy policy: nothing leaves the device;
+- third-party license notices (Tink etc.);
+- icon, theme, accessibility and texts in pt-BR/en.
 
 ---
 
-## 8. O que não fazer agora
+## 7. Interesting ideas for later
 
-- **Não dividir o projeto em muitos módulos.** `:core:protocol` e `:core:transport` bastam no
-  começo; o resto pode esperar.
-- **Não adotar Hilt/Koin.** Injeção manual continua suficiente para o tamanho atual.
-- **Não implementar Quick Share antes do MVP.** É a Fase 3 por um motivo: alto esforço e
-  protocolo de terceiros.
-- **Não investir em UWB/Aware como base.** O hardware dos dois aparelhos não fecha.
-- **Não otimizar o transfer de 16 MB sintético além do necessário.** O número que importa é
-  arquivo real gravado em disco.
-- **Não usar criptografia caseira.** Tink ou uma biblioteca auditada.
-- **Não prometer AirDrop.** Já está fora de escopo por hardware e produto.
-- **Não manter três cópias da transferência.** Unifique antes de crescer.
+- **Single-use token in NFC.** Instead of publishing static SSID/password, publish a token that
+  the receiver validates and burns. The tap becomes a physical session key.
+- **Trusted devices.** Store the other device's public key in the Keystore and skip
+  confirmation on subsequent transfers, keeping encryption.
+- **Receive without opening the app.** Quick settings tile + foreground service + HCE; the
+  user just taps and the card appears.
+- **Direct share sheet.** `ACTION_SEND`/`ACTION_SEND_MULTIPLE` with `ClipData` and temporary
+  permissions; QuicklyDrop appears as a target without opening the app.
+- **One to many.** The P2P group accepts more than one client; test 1 sender → 2 receivers,
+  with per-receiver rate.
+- **Real resume.** Manifest + persisted offset; if the app dies, it continues from the point
+  where it stopped.
+- **Text/links over BLE.** For small payloads, there is no need to bring up Wi-Fi; useful for
+  clipboard and links.
+- **QR as universal fallback.** When NFC/BLE fail, the receiver shows a QR with the token;
+  the sender reads it and joins.
+- **Smart group channel.** Measure 5 GHz channel occupancy and pick the least congested
+  (requires location; test the UX cost).
+- **UWB.** "Point and share" with centimeter ranging; optional, when hardware is available.
+- **Wi-Fi Aware.** Discovery + ranging without infrastructure; optional, when both devices
+  expose the service.
+- **History with retry.** Transfer list, resend, open folder, share again.
+- **"Receive only" mode.** Keep the device visible for X minutes, with a notification and a stop
+  button.
 
 ---
 
-## 9. Critérios de decisão
+## 8. What not to do now
 
-Para cada experimento, registrar:
+- **Do not split the project into many modules.** `:core:protocol` and `:core:transport` are enough at the
+  start; the rest can wait.
+- **Do not adopt Hilt/Koin.** Manual injection remains sufficient for the current size.
+- **Do not implement Quick Share before the MVP.** It is Phase 3 for a reason: high effort and a
+  third-party protocol.
+- **Do not invest in UWB/Aware as a base.** The hardware of the two devices does not line up.
+- **Do not optimize the synthetic 16 MB transfer beyond what is needed.** The number that matters is
+  a real file written to disk.
+- **Do not use homemade cryptography.** Tink or an audited library.
+- **Do not promise AirDrop.** It is already out of scope for hardware and product reasons.
+- **Do not keep three copies of the transfer.** Unify before growing.
 
-| Campo | Exemplo |
+---
+
+## 9. Decision criteria
+
+For each experiment, record:
+
+| Field | Example |
 |---|---|
 | ID | E1 |
-| Hipótese | com `WAKE_LOCK`, o hotspot passa de 12,7 para >15 MB/s |
-| Mudança | permissão + log de falha |
-| Medição | 3 runs/direção, `dumpsys wifi`, MB/s |
-| Critério | +15% ou `mPowerSaveDisableRequests` > 0 |
-| Resultado | (preencher) |
-| Decisão | aceitar / rejeitar / repetir |
-| Commit | (se aceitar) |
+| Hypothesis | with `WAKE_LOCK`, the hotspot goes from 12.7 to >15 MB/s |
+| Change | permission + failure log |
+| Measurement | 3 runs/direction, `dumpsys wifi`, MB/s |
+| Criterion | +15% or `mPowerSaveDisableRequests` > 0 |
+| Result | (to fill) |
+| Decision | accept / reject / repeat |
+| Commit | (if accepted) |
 
-Manter os rejeitados documentados (como o grupo em 2,4 GHz) evita repetir a mesma experiência.
+Keeping rejected ones documented (like the 2.4 GHz group) avoids repeating the same experiment.
 
 ---
 
-## 10. Arquivos de referência
+## 10. Reference files
 
 - `lab/src/main/java/dev/leandro/quicklydrop/lab/HotspotLink.kt` — `WifiLock`, hotspot, WNS.
-- `lab/src/main/java/dev/leandro/quicklydrop/lab/TcpLink.kt` — transferência, ACK, buffers.
-- `lab/src/main/java/dev/leandro/quicklydrop/lab/LanMode.kt` — mDNS + TCP (caminho separado).
-- `lab/src/main/java/dev/leandro/quicklydrop/lab/WifiDirectMode.kt` — grupo, NFC, descoberta.
-- `lab/src/main/java/dev/leandro/quicklydrop/lab/P2pConfig.kt` — SSID/senha/frequência.
-- `lab/src/main/java/dev/leandro/quicklydrop/lab/P2pCleanup.kt` — grupo velho.
+- `lab/src/main/java/dev/leandro/quicklydrop/lab/TcpLink.kt` — transfer, ACK, buffers.
+- `lab/src/main/java/dev/leandro/quicklydrop/lab/LanMode.kt` — mDNS + TCP (separate path).
+- `lab/src/main/java/dev/leandro/quicklydrop/lab/WifiDirectMode.kt` — group, NFC, discovery.
+- `lab/src/main/java/dev/leandro/quicklydrop/lab/P2pConfig.kt` — SSID/password/frequency.
+- `lab/src/main/java/dev/leandro/quicklydrop/lab/P2pCleanup.kt` — stale group.
 - `lab/src/main/java/dev/leandro/quicklydrop/lab/BleMode.kt` — BLE + GATT + hotspot.
 - `lab/src/main/java/dev/leandro/quicklydrop/lab/NfcBeam.kt` — HCE + reader mode.
-- `lab/src/main/java/dev/leandro/quicklydrop/lab/LabController.kt` — estados e modos.
-- `lab/src/main/java/dev/leandro/quicklydrop/lab/MainActivity.kt` — UI, permissões, adb.
-- `app/src/main/java/dev/leandro/quicklydrop/diag/LanTransfer.kt` — terceira cópia da transferência.
-- `PLANO.md` — plano técnico e medições.
-- `README.md` — visão do produto e comandos.
+- `lab/src/main/java/dev/leandro/quicklydrop/lab/LabController.kt` — states and modes.
+- `lab/src/main/java/dev/leandro/quicklydrop/lab/MainActivity.kt` — UI, permissions, adb.
+- `app/src/main/java/dev/leandro/quicklydrop/diag/LanTransfer.kt` — third copy of the transfer.
+- `PLANO.md` — technical plan and measurements.
+- `README.md` — product vision and commands.

@@ -1,35 +1,36 @@
-# Protocolo QuicklyDrop v1
+# QuicklyDrop Protocol v1
 
-> Status: especificação da Fase 1. Identificador de fio: `quicklydrop/1`.
-> O identificador de fio é estável e não muda com o nome comercial do aplicativo.
+> Status: alpha implementation of the Phase 1 specification. Wire identifier:
+> `quicklydrop/1`. The wire identifier is stable from the first release and does not
+> change with the commercial name of the application.
 
-## 1. Escopo
+## 1. Scope
 
-Este documento define o contrato entre emissor e receptor:
+This document defines the contract between sender and receiver:
 
-1. **Descoberta** — payload entregue por NFC (HCE).
-2. **Handshake** — Noise NK sobre TCP.
-3. **Transporte** — frames cifrados com prefixo de tamanho.
-4. **Mensagens** — oferta, aceite, dados, fim, confirmação, cancelamento e erro.
+1. **Discovery** — payload delivered over NFC (HCE).
+2. **Handshake** — Noise NK over TCP.
+3. **Transport** — encrypted frames with a length prefix.
+4. **Messages** — offer, accept, data, end, acknowledgement, cancel and error.
 
-O protocolo não depende de Android. A implementação de referência fica em `:protocol`
-(JVM puro) e é testada sem aparelho.
+The protocol does not depend on Android. The reference implementation lives in
+`:protocol` (pure JVM) and is tested without a device.
 
-## 2. Convenções
+## 2. Conventions
 
-- Inteiros em **big-endian**.
-- Strings em **UTF-8**, com prefixo de tamanho em bytes (não em caracteres).
-- `u8`, `u16`, `u32`, `u64` são inteiros sem sinal.
-- Todo decoder valida tamanho, versão e limites antes de alocar.
-- Um frame malformado encerra a sessão com `Error` e fecha o socket.
+- Integers are **big-endian**.
+- Strings are **UTF-8** with a byte-length prefix (not a character count).
+- `u8`, `u16`, `u32`, `u64` are unsigned integers.
+- Every decoder validates length, version and limits before allocating.
+- A malformed frame ends the session with `Error` and closes the socket.
 
-## 3. Descoberta (NFC)
+## 3. Discovery (NFC)
 
-O receptor emula um cartão HCE com um AID próprio. A resposta a `GET DATA` é o payload
-abaixo, seguido do status word `0x9000`.
+The receiver emulates an HCE card with AID `F05144524F50`. The response to `GET DATA` is
+the payload below followed by status word `0x9000`.
 
 ```
-offset  size  campo
+offset  size  field
 0       1     version = 1
 1       1     flags
 2       1     nameLen (0..64)
@@ -38,108 +39,120 @@ offset  size  campo
 ...     n     ssid (UTF-8)
 ...     1     passLen (0..64)
 ...     n     pass (UTF-8)
-...     2     frequency (MHz, 0 = desconhecido)
+...     2     frequency (MHz, 0 = unknown)
 ...     32    noisePublicKey (X25519)
 ```
 
 ### 3.1 Flags
 
-| Bits | Campo | Valores |
+| Bits | Field | Values |
 |---|---|---|
-| 0–1 | transporte | 1 = P2P, 2 = hotspot, 3 = LAN |
-| 2 | credenciais presentes | 0/1 |
-| 3 | chave Noise presente | 0/1 |
-| 4–7 | reservado | 0 |
+| 0–1 | transport | 1 = P2P, 2 = hotspot, 3 = LAN |
+| 2 | credentials present | 0/1 |
+| 3 | Noise key present | 0/1 |
+| 4–7 | reserved | 0 |
 
-Para o MVP, `flags = 0b00001101` (P2P + credenciais + chave).
+For the product alpha, `flags = 0b00001101` (P2P + credentials + key).
 
-### 3.2 Limites
+### 3.2 Limits
 
-- Tamanho máximo: `2 + (1+64) + (1+32) + (1+64) + 2 + 32 = 199` bytes.
-- Com o status word, a resposta APDU fica em 201 bytes, dentro do limite de APDU curta
-  (~255 bytes). O limite do HCE é o C20; se o payload crescer, será preciso chunking ou
-  APDU estendida, não um codec diferente.
+- Maximum size: `2 + (1+64) + (1+32) + (1+64) + 2 + 32 = 199` bytes.
+- With the status word, the APDU response is 201 bytes, within the short APDU limit
+  (~255 bytes). The HCE limit is the C20; if the payload grows, use chunking or extended
+  APDUs, not a different codec.
 
-### 3.3 Regras
+### 3.3 Rules
 
-- `version != 1` → o emissor aborta com "receptor incompatível".
-- `nameLen == 0` é inválido.
-- `ssidLen == 0` ou `passLen == 0` só é válido se o bit 2 estiver em 0.
-- `frequency == 0` significa "desconhecida"; o emissor cai na descoberta por peer.
-- Newlines em `name`, `ssid` e `pass` são permitidos: o formato é binário e não usa
-  delimitador de linha (resolve C21).
-- A chave Noise é a chave estática **efêmera** do receptor para aquela janela de recebimento.
+- `version != 1` → the sender aborts with "incompatible receiver".
+- `nameLen == 0` is invalid.
+- `ssidLen == 0` or `passLen == 0` is valid only when bit 2 is 0.
+- `frequency == 0` means "unknown"; the sender joins without a channel hint.
+- Newlines in `name`, `ssid` and `pass` are allowed: the format is binary and does not
+  use a line delimiter.
+- The Noise key is the receiver's **ephemeral** static key for that receive window.
 
 ## 4. Handshake (Noise)
 
-- Protocolo: `Noise_NK_25519_ChaChaPoly_SHA256`.
-- Prólogo: `quicklydrop/1` (ASCII, sem NUL).
-- O emissor é o **iniciador**; o receptor é o **respondente**.
-- O receptor gera um par de chaves X25519 **por janela de recebimento** e publica a chave
-  pública no payload NFC.
-- O emissor usa a chave pública do NFC como chave estática remota. Um atacante que não
-  leu o NFC não consegue completar o handshake.
+- Protocol: `Noise_NK_25519_ChaChaPoly_SHA256`.
+- Prologue: `quicklydrop/1` (ASCII, no NUL).
+- The sender is the **initiator**; the receiver is the **responder**.
+- The receiver generates an X25519 key pair **per receive window** and publishes the
+  public key in the NFC payload.
+- The sender uses the NFC public key as the remote static key. An attacker without the
+  NFC read cannot complete the handshake.
 
-Mensagens:
+Messages:
 
 ```
-M1 (emissor → receptor): e, es       48 bytes
-M2 (receptor → emissor): e, ee       48 bytes
+M1 (sender → receiver): e, es       48 bytes
+M2 (receiver → sender): e, ee       48 bytes
 ```
 
-Depois de M2, os dois lados chamam `Split()` e passam a usar ChaCha20-Poly1305.
+After M2 both sides call `Split()` and switch to ChaCha20-Poly1305.
 
-### 4.1 Por que NK e não XX
+Each handshake message is sent over TCP as:
 
-NK tem 1 RTT e autentica o **receptor** para o emissor. O emissor não tem identidade
-persistente: a autorização dele é a posse do payload NFC (credenciais + chave), que só
-é obtida com contato físico. XX adicionaria uma terceira mensagem e uma identidade de
-emissor que o MVP não usa. Se houver necessidade de identidade mútua ou de dispositivos
-confiáveis, o protocolo sobe para v2 com XX.
+```
+u32 messageLength (1..1024)
+u8[messageLength] message
+```
 
-### 4.2 Janela de recebimento
+The length prefix is not encrypted. It is only used during the handshake; after
+`Split()`, frames use the transport format in section 5.
 
-- A janela abre quando o receptor arma o modo "receber" e fecha por timeout (padrão 120 s)
-  ou após uma sessão concluída.
-- Ao fechar, o receptor limpa o payload NFC, derruba o grupo P2P e descarta as chaves.
-- Uma janela aceita **uma** sessão. Uma segunda conexão é recusada.
-- O payload NFC só é válido enquanto a janela está aberta.
+### 4.1 Why NK instead of XX
 
-### 4.3 Limites do Noise
+NK has 1 RTT and authenticates the **receiver** to the sender. The sender has no
+persistent identity: its authorization is possession of the NFC payload (credentials and
+key), which requires physical contact. XX would add a third message and a sender identity
+the MVP does not use. If mutual identity or trusted devices are needed, the protocol
+moves to v2 with XX.
 
-- Pacote Noise máximo: 65535 bytes.
-- Tamanho máximo de plaintext por frame: 65519 bytes.
-- O MVP usa payload de dados de até 32 KiB por frame.
+### 4.2 Receive window
 
-## 5. Transporte
+- The window opens when the receiver is armed and closes after a timeout (default 120 s)
+  or after one completed session.
+- On close, the receiver clears the NFC payload, removes the P2P group and drops the keys.
+- A window accepts **one** session. A second connection is refused.
+- The NFC payload is valid only while the window is open.
 
-Cada frame é enviado como:
+### 4.3 Noise limits
+
+- Maximum Noise packet: 65535 bytes.
+- Maximum plaintext per frame: 65519 bytes.
+- The product uses data frames of up to 32 KiB.
+
+## 5. Transport
+
+TCP port: **8992**.
+
+Each frame is sent as:
 
 ```
 u32 ciphertextLength (1..65535)
 u8[ciphertextLength] ciphertext
 ```
 
-`ciphertext = Noise.encrypt(plaintextFrame)`, incluindo o tag de 16 bytes.
+`ciphertext = Noise.encrypt(plaintextFrame)`, including the 16-byte tag.
 
-O prefixo de tamanho **não** é cifrado. Isso revela apenas o tamanho de cada frame; o
-conteúdo, o tipo e os metadados ficam cifrados. Não há padding no v1.
+The length prefix is **not** encrypted. It reveals only the size of each frame; content,
+type and metadata are encrypted. There is no padding in v1.
 
 Plaintext:
 
 ```
 u8 type
-u8 flags (0 no v1)
+u8 flags (0 in v1)
 payload...
 ```
 
-## 6. Mensagens
+## 6. Messages
 
 ### 6.1 Offer (0x01)
 
 ```
 u16 fileCount (1..1024)
-repete fileCount vezes:
+repeat fileCount times:
   u16 nameLen (1..255)
   name (UTF-8)
   u64 size
@@ -147,18 +160,19 @@ repete fileCount vezes:
   mime (UTF-8)
 ```
 
-`size` é o tamanho exato do arquivo. O receptor rejeita `size` acima do limite local
-(padrão 10 GiB) ou acima do espaço livre.
+`size` is the exact file size. The receiver rejects a size above the local limit
+(default 10 GiB) or above the free space. The Android implementation sanitizes names and
+limits them to 200 UTF-8 bytes before creating `FileMeta`.
 
 ### 6.2 Accept (0x02)
 
 ```
 u16 fileIndex
-u64 startOffset (0 no v1)
+u64 startOffset (0 in v1)
 ```
 
-`startOffset` reserva a retomada. No v1 o receptor sempre envia 0 e rejeita `Data` com
-offset diferente do esperado.
+`startOffset` reserves resume support. In v1 the receiver always sends 0 and rejects
+`Data` with an offset different from the expected one.
 
 ### 6.3 Reject (0x03)
 
@@ -168,7 +182,7 @@ u16 messageLen (0..512)
 message (UTF-8)
 ```
 
-Motivos: 1 = usuário, 2 = não suportado, 3 = ocupado, 4 = sem espaço, 5 = inválido.
+Reasons: 1 = user, 2 = unsupported, 3 = busy, 4 = no space, 5 = invalid.
 
 ### 6.4 Data (0x04)
 
@@ -186,23 +200,23 @@ u16 fileIndex
 u8[32] sha256
 ```
 
-O SHA-256 cobre o conteúdo completo do arquivo. O receptor calcula enquanto grava e
-compara. Divergência → apaga o arquivo parcial e responde `Ack` com status 1.
+The SHA-256 covers the complete file content. The receiver computes it while writing and
+compares. On mismatch it deletes the partial file and replies with `Ack` status 1.
 
 ### 6.6 Ack (0x06)
 
 ```
 u16 fileIndex
-u8 status (0 = ok, 1 = hash divergente, 2 = erro de escrita, 3 = cancelado)
+u8 status (0 = ok, 1 = hash mismatch, 2 = write error, 3 = cancelled)
 ```
 
 ### 6.7 Cancel (0x07)
 
 ```
-u8 reason (1 = usuário, 2 = timeout, 3 = erro)
+u8 reason (1 = user, 2 = timeout, 3 = error)
 ```
 
-Pode ser enviado por qualquer lado. O receptor apaga o arquivo parcial.
+Either side may send it. The receiver deletes the partial file.
 
 ### 6.8 Error (0x08)
 
@@ -212,63 +226,80 @@ u16 messageLen (0..512)
 message (UTF-8)
 ```
 
-Códigos:
+Codes:
 
-| Código | Significado |
+| Code | Meaning |
 |---|---|
-| 0x0001 | versão inválida |
-| 0x0002 | frame inválido |
-| 0x0003 | frame inesperado |
-| 0x0004 | arquivo grande demais |
-| 0x0005 | sem espaço |
-| 0x0006 | hash divergente |
-| 0x0007 | erro de escrita |
-| 0x0008 | cancelado |
+| 0x0001 | invalid version |
+| 0x0002 | invalid frame |
+| 0x0003 | unexpected frame |
+| 0x0004 | file too large |
+| 0x0005 | no space |
+| 0x0006 | hash mismatch |
+| 0x0007 | write error |
+| 0x0008 | cancelled |
 | 0x0009 | timeout |
-| 0x000A | erro interno |
+| 0x000A | internal error |
 
-Tipos 0x09–0xFF são reservados. Um tipo desconhecido gera `Error 0x0002` e fecha.
+Types 0x09–0xFF are reserved. An unknown type produces `Error 0x0002` and closes the
+session.
 
-## 7. Fluxo
+## 7. Transfer state
+
+`TransferStateMachine` validates one file at a time:
 
 ```
-receptor: abre janela (grupo P2P + chaves + NFC + servidor TCP)
-emissor:  lê NFC, entra no grupo, conecta TCP
-ambos:    Noise NK (M1, M2, Split)
-emissor:  Offer
-receptor: valida metadados e envia Accept (startOffset = 0)
-emissor:  Data*
-emissor:  End(sha256)
-receptor: grava, confere hash, envia Ack
-repete para cada arquivo
-ambos:    fecham a sessão
-receptor: fecha a janela
+IDLE → OFFER_SENT → ACCEPTED → SENDING → AWAITING_ACK → COMPLETED
+                         ↘ FAILED     ↘ CANCELLED
 ```
 
-No MVP o receptor **aceita automaticamente** quando o handshake conclui. Não há diálogo
-de aceite. A segurança vem do contato físico: sem ler o NFC, o emissor não tem a chave
-nem as credenciais. O usuário pode cancelar pela notificação.
+- `FAILED` and `CANCELLED` are terminal.
+- The session owns the loop over files and decides whether a failure aborts the rest.
+- The sender and receiver both use the same sequence; the receiver opens the sink before
+  sending `Accept` and aborts it on every failure path.
 
-## 8. Compatibilidade
+## 8. Flow
 
-- O receptor aceita apenas a mesma versão maior (`quicklydrop/1`).
-- O prólogo do Noise já vincula a versão: versões diferentes falham no handshake com
-  mensagem clara, sem tentar interpretar bytes desconhecidos.
-- Campos novos devem ser adicionados em uma versão nova, não como sufixo ignorado.
-- O decoder v1 rejeita bytes sobrando no fim de um frame.
+```
+receiver: open window (P2P group + keys + NFC + TCP server)
+sender:   read NFC, join group, connect TCP
+both:     Noise NK (M1, M2, Split)
+sender:   Offer
+receiver: validate metadata and storage, send Accept (startOffset = 0)
+sender:   Data*
+sender:   End(sha256)
+receiver: write, verify hash, send Ack
+repeat for each file
+both:     close the session
+receiver: close the window
+```
 
-## 9. Invariantes de segurança
+In the MVP the receiver **accepts automatically** when the handshake completes. There is
+no accept dialog. Security comes from physical contact: without reading the NFC, the
+sender has neither the key nor the credentials. The user can cancel from the notification.
 
-1. Nenhum byte de arquivo ou metadado trafega fora do Noise.
-2. A chave pública do receptor vem do NFC e é a única aceita pelo emissor.
-3. As chaves são efêmeras por janela; não há chave de sessão persistida.
-4. O receptor só aceita uma sessão por janela.
-5. O nome do arquivo é sanitizado antes de tocar no MediaStore.
-6. O hash é verificado antes de o arquivo ser considerado concluído.
+## 9. Compatibility
 
-## 10. Pendências
+- The receiver accepts only the same major version (`quicklydrop/1`).
+- The Noise prologue already binds the version: different versions fail the handshake
+  with a clear message, without interpreting unknown bytes.
+- New fields must be added in a new version, not as an ignored suffix.
+- The v1 decoder rejects trailing bytes at the end of a frame.
 
-- Chunking do payload NFC se ele passar de 255 bytes (C20).
-- Retomada por offset (campo reservado; implementação futura).
-- Múltiplos emissores simultâneos (fora do MVP).
-- Padding de frames para reduzir análise de tráfego (fora do MVP).
+## 10. Security invariants
+
+1. No file byte or metadata travels outside Noise.
+2. The receiver's public key comes from NFC and is the only key the sender accepts.
+3. Keys are ephemeral per window; no session key is persisted.
+4. The receiver accepts only one session per window.
+5. File names are sanitized before touching MediaStore.
+6. The hash is verified before a file is considered complete.
+
+## 11. Pending
+
+- NFC payload chunking if it grows beyond 255 bytes (C20).
+- Resume by offset (field reserved; future implementation).
+- Multiple simultaneous senders (out of MVP).
+- Frame padding to reduce traffic analysis (out of MVP).
+- Official Noise test vectors in CI.
+- Hardware validation of the complete flow.

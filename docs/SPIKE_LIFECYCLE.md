@@ -1,194 +1,199 @@
-# Spike de lifecycle do receptor
+# Receiver lifecycle spike
 
-> Fase B. Mede o que o Android permite fazer quando o receptor é tocado por NFC, sem
-> depender de o app estar aberto. O resultado decide a UX do receptor no produto.
+> Phase B. Measures what Android allows when the receiver is touched by NFC without
+> depending on the app being open. The result decides the receiver UX in the product.
+>
+> **Status:** the spike code exists in `:lab`, but the matrix has not been executed. The
+> product alpha therefore takes the conservative path: the receiver must be armed with
+> the app open, and the receive session runs in a foreground service. Execute this spike
+> before promising background receive.
 
-## 1. Perguntas
+## 1. Questions
 
-1. O HCE é invocado com o app em foreground, em background, morto e com `force-stop`?
-2. O HCE é invocado com a tela apagada e com a tela travada?
-3. O processo é criado do zero? Quanto tempo ele leva até o primeiro APDU?
-4. O app consegue iniciar um serviço em primeiro plano (`connectedDevice`) a partir do
-   toque?
-5. O broadcast `ACTION_TRANSACTION_DETECTED` chega? (Ele é documentado para Secure
-   Element; o spike confirma se também vale para HCE.)
-6. O grupo Wi-Fi Direct pode ser criado a partir do toque?
-7. Qual a diferença entre `requireDeviceScreenOn="false"` e `"true"`?
+1. Is HCE invoked with the app in the foreground, in the background, killed and
+   `force-stop`?
+2. Is HCE invoked with the screen off and with the screen locked?
+3. Is the process created from scratch? How long does it take until the first APDU?
+4. Can the app start a foreground service (`connectedDevice`) from the tap?
+5. Does the `ACTION_TRANSACTION_DETECTED` broadcast arrive? (It is documented for Secure
+   Element; the spike checks whether it also applies to HCE.)
+6. Can the Wi-Fi Direct group be created from the tap?
+7. What is the difference between `requireDeviceScreenOn="false"` and `"true"`?
 
-## 2. Componentes
+## 2. Components
 
-| Componente | Papel |
+| Component | Role |
 |---|---|
-| `SpikeApduService` | HCE permissivo, AID `F05144524F51`, `requireDeviceScreenOn="false"` |
-| `SpikeScreenOnApduService` | HCE estrito, AID `F05144524F52`, `requireDeviceScreenOn="true"` |
-| `SpikeForegroundService` | FGS mínimo, tipo `connectedDevice`, notificação de teste |
-| `SpikeReceiver` | Receiver de `android.nfc.action.TRANSACTION_DETECTED` |
-| `SpikeReader` | Reader mode no emissor, escolhe o AID permissivo ou estrito |
-| `SpikeStore` | Persiste payload e opções para sobreviver à morte do processo |
-| `SpikeLog` | Logcat (tag `QuicklyDropSpike`) + `filesDir/spike.log` |
-| `SpikePresence` | PID, idade do processo, atividade visível, FGS, tela, keyguard, Secure NFC |
+| `SpikeApduService` | Permissive HCE, AID `F05144524F51`, `requireDeviceScreenOn="false"` |
+| `SpikeScreenOnApduService` | Strict HCE, AID `F05144524F52`, `requireDeviceScreenOn="true"` |
+| `SpikeForegroundService` | Minimal FGS, type `connectedDevice`, test notification |
+| `SpikeReceiver` | Receiver for `android.nfc.action.TRANSACTION_DETECTED` |
+| `SpikeReader` | Reader mode on the sender, chooses the permissive or strict AID |
+| `SpikeStore` | Persists payload and options so they survive process death |
+| `SpikeLog` | Logcat tag `QuicklyDropSpike` + `filesDir/spike.log` |
+| `SpikePresence` | PID, process age, visible activity, FGS, screen, keyguard, Secure NFC |
 
-O payload do spike é texto de teste. As chaves reais continuam só na memória; o spike
-persiste o payload apenas para conseguir medir o cenário de processo morto.
+The spike payload is test text. Real keys stay in memory only; the spike persists the
+payload only to measure the dead-process scenario.
 
-## 3. Comandos
+## 3. Commands
 
-Instalação:
+Install:
 
 ```bash
 adb -s <serial> install -r lab/build/outputs/apk/debug/lab-debug.apk
 ```
 
-Armar o receptor:
+Arm the receiver:
 
 ```bash
 adb -s <serial> shell am start -n dev.leandro.quicklydrop.lab/.MainActivity \
   --es action spike-arm --es payload "SPIKE-RECV-1" --ez fgs true --ez group true
 ```
 
-Ler no emissor (AID permissivo):
+Read on the sender (permissive AID):
 
 ```bash
 adb -s <serial> shell am start -n dev.leandro.quicklydrop.lab/.MainActivity \
   --es action spike-read --ez screenOn false
 ```
 
-Ler no emissor (AID estrito):
+Read on the sender (strict AID):
 
 ```bash
 adb -s <serial> shell am start -n dev.leandro.quicklydrop.lab/.MainActivity \
   --es action spike-read --ez screenOn true
 ```
 
-Comandos auxiliares:
+Auxiliary commands:
 
 ```bash
-# estado do processo e do aparelho
+# process and device state
 adb -s <serial> shell am start -n dev.leandro.quicklydrop.lab/.MainActivity --es action spike-info
 
-# baseline: FGS a partir da atividade em foreground
+# baseline: FGS from a foreground activity
 adb -s <serial> shell am start -n dev.leandro.quicklydrop.lab/.MainActivity --es action spike-fgs
 
-# baseline: grupo P2P a partir da atividade
+# baseline: P2P group from the activity
 adb -s <serial> shell am start -n dev.leandro.quicklydrop.lab/.MainActivity --es action spike-group
 
-# limpar log
+# clear logs
 adb -s <serial> shell am start -n dev.leandro.quicklydrop.lab/.MainActivity --es action spike-reset
 
-# desarmar
+# disarm
 adb -s <serial> shell am start -n dev.leandro.quicklydrop.lab/.MainActivity --es action spike-disarm
 ```
 
-Coleta:
+Collect:
 
 ```bash
 adb -s <serial> logcat -d -s QuicklyDropSpike
 adb -s <serial> shell run-as dev.leandro.quicklydrop.lab cat files/spike.log
 ```
 
-Eventos esperados no log:
+Expected log events:
 
-| Evento | Significado |
+| Event | Meaning |
 |---|---|
-| `activity.start` / `activity.stop` | Atividade visível mudou |
-| `hce.onCreate` | Android criou o serviço HCE (processo pode ter nascido aqui) |
-| `hce.apdu` | Um APDU chegou |
-| `hce.tap` | GET DATA com payload válido |
-| `hce.fgs` | Tentativa de iniciar o FGS e resultado |
-| `fgs.onCreate` / `fgs.started` / `fgs.failed` | Ciclo do FGS |
-| `receiver.transaction` | Broadcast de transação chegou |
-| `hce.p2p` | Tentativa de `createGroup` e resultado |
-| `reader.start` / `reader.payload` / `reader.stop` | Lado emissor |
+| `activity.start` / `activity.stop` | Visible activity changed |
+| `hce.onCreate` | Android created the HCE service (the process may have started here) |
+| `hce.apdu` | An APDU arrived |
+| `hce.tap` | GET DATA with a valid payload |
+| `hce.fgs` | FGS start attempt and result |
+| `fgs.onCreate` / `fgs.started` / `fgs.failed` | FGS lifecycle |
+| `receiver.transaction` | Transaction broadcast arrived |
+| `hce.p2p` | `createGroup` attempt and result |
+| `reader.start` / `reader.payload` / `reader.stop` | Sender side |
 
-## 4. Matriz
+## 4. Matrix
 
-Para cada linha: armar, limpar o log, preparar o estado, tocar, coletar. Repetir com o
-AID permissivo e com o AID estrito.
+For each row: arm, clear the log, prepare the state, tap, collect. Repeat with the
+permissive and the strict AID.
 
-| # | App | Tela | Secure NFC | FGS no toque | Grupo no toque | HCE? | APDU? | FGS? | Broadcast? | Grupo? | Notas |
+| # | App | Screen | Secure NFC | FGS on tap | Group on tap | HCE? | APDU? | FGS? | Broadcast? | Group? | Notes |
 |---|---|---|---|---|---|---|---|---|---|---|---|
-| 1 | foreground | ligada, destravada | desligado | sim | sim | | | | | | baseline |
-| 2 | foreground | ligada, destravada | ligado | sim | sim | | | | | | |
-| 3 | background (home) | ligada, destravada | desligado | sim | sim | | | | | | |
-| 4 | background (home) | ligada, destravada | ligado | sim | sim | | | | | | |
-| 5 | processo morto (`am kill`) | ligada, destravada | desligado | sim | sim | | | | | | |
-| 6 | processo morto (`am kill`) | ligada, destravada | ligado | sim | sim | | | | | | |
-| 7 | `force-stop` | ligada, destravada | desligado | sim | sim | | | | | | |
-| 8 | foreground | apagada | desligado | sim | sim | | | | | | |
-| 9 | foreground | apagada | ligado | sim | sim | | | | | | |
-| 10 | background | apagada | desligado | sim | sim | | | | | | |
-| 11 | background | apagada | ligado | sim | sim | | | | | | |
-| 12 | foreground | travada | desligado | sim | sim | | | | | | |
-| 13 | foreground | travada | ligado | sim | sim | | | | | | |
-| 14 | background | travada | desligado | sim | sim | | | | | | |
-| 15 | background | travada | ligado | sim | sim | | | | | | |
+| 1 | foreground | on, unlocked | off | yes | yes | | | | | | baseline |
+| 2 | foreground | on, unlocked | on | yes | yes | | | | | | |
+| 3 | background (home) | on, unlocked | off | yes | yes | | | | | | |
+| 4 | background (home) | on, unlocked | on | yes | yes | | | | | | |
+| 5 | process killed (`am kill`) | on, unlocked | off | yes | yes | | | | | | |
+| 6 | process killed (`am kill`) | on, unlocked | on | yes | yes | | | | | | |
+| 7 | `force-stop` | on, unlocked | off | yes | yes | | | | | | |
+| 8 | foreground | off | off | yes | yes | | | | | | |
+| 9 | foreground | off | on | yes | yes | | | | | | |
+| 10 | background | off | off | yes | yes | | | | | | |
+| 11 | background | off | on | yes | yes | | | | | | |
+| 12 | foreground | locked | off | yes | yes | | | | | | |
+| 13 | foreground | locked | on | yes | yes | | | | | | |
+| 14 | background | locked | off | yes | yes | | | | | | |
+| 15 | background | locked | on | yes | yes | | | | | | |
 
-Cada linha é executada duas vezes: AID permissivo e AID estrito. A coluna "FGS no toque"
-e "Grupo no toque" vêm do `--ez fgs` / `--ez group`; para isolar uma variável, desligue a
-outra.
+Each row is executed twice: permissive AID and strict AID. The "FGS on tap" and "Group on
+tap" columns come from `--ez fgs` / `--ez group`; to isolate one variable, turn the other
+off.
 
-### 4.1 Preparação dos estados
+### 4.1 Preparing the states
 
 ```bash
-# foreground: abrir a atividade
+# foreground: open the activity
 adb -s <serial> shell am start -n dev.leandro.quicklydrop.lab/.MainActivity
 
-# background: voltar para a home
+# background: go to the home screen
 adb -s <serial> shell input keyevent KEYCODE_HOME
 
-# processo morto: mata processos em background (não é o mesmo que remover dos recentes,
-# mas produz o mesmo efeito de processo recriado)
+# process killed: kills background processes (not the same as removing from recents,
+# but it recreates the process)
 adb -s <serial> shell am kill dev.leandro.quicklydrop.lab
 
-# force-stop: desabilita o app e o HCE até o app ser aberto de novo
+# force-stop: disables the app and HCE until the app is opened again
 adb -s <serial> shell am force-stop dev.leandro.quicklydrop.lab
 
-# tela apagada / ligada
+# screen off / on
 adb -s <serial> shell input keyevent KEYCODE_POWER
 
-# destravar (aparelho sem PIN)
+# unlock (device without a PIN)
 adb -s <serial> shell wm dismiss-keyguard
 ```
 
-Para a tela travada com PIN, o teste precisa do aparelho já travado; o desbloqueio
-seguinte fica com o usuário. Não altere a senha do aparelho por adb.
+For a screen locked with a PIN, the test needs the device already locked; the next unlock
+is left to the user. Do not change the device password over adb.
 
-## 5. Resultados
+## 5. Results
 
-> Preencher depois da execução. Uma linha por cenário e por AID.
+> Fill in after execution. One row per scenario and per AID.
 
-### 5.1 Resumo
+### 5.1 Summary
 
-| Pergunta | Resposta |
+| Question | Answer |
 |---|---|
-| HCE com app em foreground | |
-| HCE com app em background | |
-| HCE com processo morto | |
-| HCE com `force-stop` | |
-| HCE com tela apagada | |
-| HCE com tela travada | |
-| FGS a partir do HCE | |
-| FGS a partir do broadcast | |
-| `createGroup` a partir do HCE | |
-| `requireDeviceScreenOn` faz diferença | |
+| HCE with the app in the foreground | |
+| HCE with the app in the background | |
+| HCE with the process killed | |
+| HCE with `force-stop` | |
+| HCE with the screen off | |
+| HCE with the screen locked | |
+| FGS from HCE | |
+| FGS from the broadcast | |
+| `createGroup` from HCE | |
+| Does `requireDeviceScreenOn` make a difference? | |
 
-### 5.2 Observações
+### 5.2 Observations
 
 -
 
-## 6. Decisão de UX
+## 6. UX decision
 
-Critério:
+Criteria:
 
-- Se o HCE e o FGS funcionam com a tela apagada/travada, o receptor pode ficar armado
-  com o app fechado e o toque basta.
-- Se o HCE funciona mas o FGS é bloqueado, a sessão pode viver no serviço vinculado
-  enquanto o NFC estiver ativo, mas a transferência longa precisa de outra âncora
-  (notificação, tile ou app aberto). Medir o tempo de vida do processo antes de decidir.
-- Se o HCE só funciona com a tela ligada, o produto exige a tela ligada para receber; a
-  notificação/tile passa a ser o caminho para armar.
-- `requireDeviceScreenOn="true"` é mais restritivo e não protege contra um atacante com
-  o aparelho na mão; só evita o gasto de energia com a tela apagada. A decisão fica com
-  o resultado medido.
+- If HCE and FGS work with the screen off or locked, the receiver can stay armed with the
+  app closed and the tap is enough.
+- If HCE works but FGS is blocked, the session can live in a bound service while NFC is
+  active, but a long transfer needs another anchor (notification, tile or open app).
+  Measure the process lifetime before deciding.
+- If HCE works only with the screen on, the product requires the screen on to receive;
+  the notification/tile becomes the way to arm.
+- `requireDeviceScreenOn="true"` is more restrictive and does not protect against an
+  attacker holding the phone; it only avoids spending power with the screen off. The
+  measured result decides.
 
-Decisão: _pendente de execução_.
+Decision: **pending execution. The current alpha requires the app open and armed.**

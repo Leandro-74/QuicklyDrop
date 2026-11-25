@@ -1,84 +1,146 @@
 # QuicklyDrop
 
-Compartilhamento de arquivos por proximidade entre dispositivos Android. A transferência
-ocorre inteiramente entre os dois aparelhos: sem conta, sem nuvem, sem servidor.
+[Português (Brasil)](README.pt-BR.md)
 
-> **Status:** Fase 0 concluída. O repositório contém a ferramenta de diagnóstico (`:diag`), o
-> laboratório de protocolos (`:lab`) e a base do `:core`. O app de produto (Fase 1) ainda não
-> foi implementado.
+Proximity file sharing between Android devices. The transfer happens entirely between
+the two phones: no account, no cloud, no server.
 
----
+> **Status:** `0.1.0-alpha01`. The product app (`:app`) implements NFC discovery,
+> Wi-Fi Direct, Noise NK, file transfer with SHA-256, MediaStore storage and a receiver
+> foreground service. The protocol and core logic have automated tests, but the product
+> has **not been validated on physical devices yet**. Treat this release as an alpha.
 
-## Arquitetura
+## What works
 
-1. **Descoberta.** NFC (HCE + reader mode) é o gatilho principal: o receptor publica nome,
-   SSID, senha e frequência do grupo. BLE é a alternativa para dispositivos sem NFC.
-2. **Transporte.** O receptor hospeda a conexão; o emissor envia.
-   - Wi-Fi Direct: grupo em 5 GHz (5745 MHz, não-DFS), com fallback automático de canal.
-   - LocalOnlyHotspot + `WifiNetworkSpecifier`: reserva para dispositivos sem P2P.
-   - LAN comum: TCP direto quando os dois já estão na mesma rede.
-3. **Segurança.** Noise NK (X25519 + ChaCha20-Poly1305 + SHA-256) sobre TCP. A chave
-   pública efêmera do receptor vai no payload NFC e autentica o toque; o receptor aceita
-   sem diálogo. O laboratório ainda transfere texto claro; o `:protocol` já tem o handshake
-   e o canal cifrado.
-4. **Transferência.** Framing por comprimento, SHA-256 por arquivo e retomada por offset
-   (Fase 1). O laboratório usa um `TcpLink` compartilhado, com ACK final, timeouts e
-   cancelamento.
+- **Receiver:** arms a Wi-Fi Direct group, publishes SSID, passphrase, frequency and
+  Noise public key over NFC, waits for one sender and stores files in
+  `Download/QuicklyDrop` through MediaStore.
+- **Sender:** accepts files from the Android share sheet or the file picker, reads the
+  receiver's NFC tag, joins the group, connects over TCP and sends one or more files.
+- **Security:** Noise NK (`Noise_NK_25519_ChaChaPoly_SHA256`) over TCP, with the
+  receiver's ephemeral public key delivered by the NFC payload.
+- **Integrity:** SHA-256 per file; a file is committed only after the hash matches.
+- **Names:** sanitized against path traversal and control characters; collisions get a
+  `(1)`, `(2)` suffix.
+- **Receiver UI:** foreground service with a progress notification and a cancel action.
+- **Product UI:** share target, receive screen, send screen, progress and result.
+- **Cancellation:** closing the active socket interrupts a blocked read or write.
 
-## Transportes
+## Known limitations
 
-| Transporte | Uso | Estado |
+- **No hardware validation yet.** Phase 0 validated the transports in the lab, but the
+  product integration has not run on a phone.
+- The receiver must be armed with the app open. HCE and foreground-service behavior with
+  the screen off or the app in the background is unverified.
+- The sender must keep the screen open during the transfer; sending runs in the
+  activity/ViewModel, not in a foreground service.
+- No BLE, LocalOnlyHotspot, LAN fallback, Wi-Fi Aware or UWB in the product.
+- No resume, history, trusted devices or Quick Share interoperability.
+- Content URIs whose size cannot be resolved are rejected.
+- The NFC payload and credentials live only in memory; if the process dies, arm again.
+- This is an alpha: expect failures and report the device model, Android version and
+  logcat output.
+
+## Requirements
+
+- Android 10 (API 29) or newer, with NFC and Wi-Fi Direct.
+- Both phones need QuicklyDrop.
+- JDK 21 and Android SDK 35 to build.
+
+## Architecture
+
+| Module | Type | Responsibility |
 |---|---|---|
-| NFC (HCE + reader mode) | gatilho e troca de credenciais | validado |
-| BLE | descoberta alternativa | validado |
-| Wi-Fi Direct | dados | validado |
-| LocalOnlyHotspot | dados (reserva) | validado |
-| LAN (TCP) | dados | validado |
-| Wi-Fi Aware (NAN) | descoberta e dados | **não validado**: requer hardware que exponha o serviço `wifi_aware` |
-| UWB | ranging de proximidade | **não validado**: requer hardware compatível |
+| `:app` | Android app | Compose UI, share target, permissions, send flow, receive screen |
+| `:core` | Android library | NFC, Wi-Fi Direct, send/receive sessions, MediaStore, foreground service |
+| `:protocol` | Pure JVM | Discovery payload, Noise NK, frame codec, secure channel, transfer state |
+| `:lab` | Android app | Transport benchmarks and protocol experiments |
+| `:diag` | Android app | Radio and capability diagnostics from Phase 0 |
 
-Wi-Fi Aware e UWB permanecem no roadmap como opcionais; a validação depende de hardware
-disponível.
+The receiver arms a Noise responder key pair, creates the Wi-Fi Direct group, opens a
+server socket and publishes the payload over HCE. The sender reads the payload, joins the
+group, connects to the group owner and performs the Noise handshake. Files are sent as
+`Offer`, `Accept`, `Data*`, `End` and `Ack`; the receiver commits to MediaStore only after
+the hash matches.
 
-## Validação
+- TCP port: `8992`.
+- HCE AID: `F05144524F50`.
+- Wire identifier: `quicklydrop/1`.
+- Protocol details: [docs/PROTOCOL.md](docs/PROTOCOL.md).
+- Architecture details: [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md).
+- Security model: [docs/SECURITY.md](docs/SECURITY.md).
 
-Medições de 01/11/2026, transferência de 16 MB, aparelhos a ~20 cm:
+## Build
 
-| Caminho | Setup | Throughput |
-|---|---|---|
-| BLE (descoberta) | 0,1–0,6 s | — |
-| NFC (toque → credenciais) | 0,02 s | — |
-| Wi-Fi Direct (toque → grupo) | 0,86 s (mediana) | 35–48 MB/s |
-| LocalOnlyHotspot + `WifiNetworkSpecifier` | 7–10 s (diálogo do sistema) | 10–12 MB/s |
-| LAN comum | 0,3–3,6 s | 1,6–5,7 MB/s |
+Requirements: JDK 21 and Android SDK 35 (platform + build-tools).
 
-Os valores são específicos do par de aparelhos de teste e do ambiente de rede; não
-representam todos os Androids.
+```bash
+echo "sdk.dir=$HOME/Android/Sdk" > local.properties
 
-### Dispositivos de teste
-
-| Aparelho | Android | Observação |
-|---|---|---|
-| Motorola Edge 50 Ultra | 17 (SDK 37) | Wi-Fi Direct; sem serviço `wifi_aware`; UWB presente |
-| Samsung Galaxy S21 (SM-G991B) | 15 (SDK 35) | Wi-Fi Direct; Wi-Fi Aware disponível |
-
-## Estrutura
-
+./gradlew :app:assembleDebug
+adb install -r app/build/outputs/apk/debug/app-debug.apk
 ```
-diag/           ferramenta de diagnóstico (capacidades de rádio, hotspot, BLE, throughput)
-core/           biblioteca Android: transporte TCP e, na Fase 1, sessão e armazenamento
-lab/            laboratório de protocolos: testa um caminho de conexão por vez
-protocol/       protocolo v1 em JVM pura: payload NFC, Noise NK, frames e canal seguro
-docs/           PROTOCOL.md, ARCHITECTURE.md, SECURITY.md e NAMING.md
-PLANO.md        plano técnico: protocolos, arquitetura, riscos, medições
-MELHORIAS.md    análise, correções e experimentos, com o resultado de cada um
+
+If multiple JDKs are installed, point `JAVA_HOME` at JDK 21. The build currently does
+not run on JDK 27 because Kotlin 2.0.21 cannot parse that version.
+
+### Tests
+
+```bash
+./gradlew :protocol:test :core:testDebugUnitTest :app:testDebugUnitTest \
+  :lab:testDebugUnitTest :diag:testDebugUnitTest
+
+./gradlew :app:lintDebug
 ```
 
-## Laboratório (`lab/`)
+The suite includes protocol round-trips, malformed frames, Noise loopback, full transfer
+loopback over TCP, cancellation, hash mismatch, storage sanitization, MediaStore,
+P2P permissions, notification state and share-intent parsing. Instrumented tests and
+hardware tests are still missing.
 
-Tela colorida por estado: cinza parado, azul procurando, âmbar peer encontrado, laranja
-conectando, verde conectado, verde escuro transferindo, vermelho erro. Cada execução transfere
-16 MB e reporta setup e MB/s.
+### Release APK
+
+Copy `.env.example` to `.env` and fill in the keystore path, password and alias. The
+keystore must live outside the repository.
+
+```bash
+cp .env.example .env
+# edit .env
+./gradlew :app:assembleRelease
+```
+
+The APK is written to `app/build/outputs/apk/release/app-release.apk`. The GitHub
+`Release` workflow builds and publishes the APK when a `v*` tag is pushed. It expects the
+same values in repository secrets:
+
+- `QUICKLYDROP_KEYSTORE_BASE64`
+- `QUICKLYDROP_KEYSTORE_PASSWORD`
+- `QUICKLYDROP_KEY_ALIAS`
+- `QUICKLYDROP_KEY_PASSWORD`
+
+Never commit `.env` or the keystore. Back up both; losing the keystore prevents updates
+to an already published app.
+
+## Using the app
+
+### Receive
+
+1. Open QuicklyDrop and tap **Receive files**.
+2. Keep the receiver armed and tap the sender's phone to this phone.
+3. The receiver creates the group and shows a foreground notification.
+4. Files appear in `Download/QuicklyDrop`.
+
+### Send
+
+1. Share files from any app and choose QuicklyDrop, or tap **Send files** and pick files.
+2. Tap **Scan receiver** and touch the receiver's phone.
+3. Keep this screen open while the transfer runs.
+
+## Laboratory
+
+The lab still tests one connection path at a time: `LAN` (mDNS + TCP), `BLE`
+(BLE + GATT + hotspot), `NFC` (tap + hotspot) and `P2P` (tap + Wi-Fi Direct). Each run
+transfers 16 MB and reports setup time and MB/s.
 
 ```bash
 PKG=dev.leandro.quicklydrop.lab
@@ -88,67 +150,53 @@ adb shell am start -n $PKG/.MainActivity --es action stop
 adb logcat -s QuicklyDropLab:I
 ```
 
-Modos: `LAN` (mDNS + TCP), `BLE` (BLE + GATT + hotspot), `NFC` (toque + hotspot) e `P2P`
-(toque + Wi-Fi Direct). No toque, o receptor cria o grupo/hotspot e o emissor entra e envia os
-dados. No Wi-Fi Direct o receptor publica nome, SSID, senha e frequência; o emissor entra
-direto com SSID/senha, sem descoberta, WPS ou diálogo de confirmação.
+The lifecycle spike and its commands are documented in
+[docs/SPIKE_LIFECYCLE.md](docs/SPIKE_LIFECYCLE.md). It has not been executed.
 
-Os quatro modos usam o mesmo `TcpLink`: ACK final de 10 s, timeout de inatividade de 30 s,
-`Parar` que fecha o socket ativo e a mesma medição de taxa. `setupMs` cobre apenas a conexão.
-
-Testes:
-
-```bash
-./gradlew :protocol:test :core:testDebugUnitTest :lab:testDebugUnitTest :diag:testDebugUnitTest
-```
-
-## Compilar
-
-Requisitos: JDK 21 e Android SDK 35 (platform + build-tools).
-
-```bash
-echo "sdk.dir=$HOME/Android/Sdk" > local.properties
-
-./gradlew :lab:assembleDebug :diag:assembleDebug
-adb install -r lab/build/outputs/apk/debug/lab-debug.apk
-adb install -r diag/build/outputs/apk/debug/diag-debug.apk
-```
-
-## Ferramenta de diagnóstico
-
-Ações disparáveis por adb:
+## Diagnostics
 
 ```bash
 PKG=dev.leandro.quicklydrop.diag
-
-# capacidades do aparelho (Wi-Fi Aware, Direct, NFC, BLE, UWB)
 adb shell am start -n $PKG/.MainActivity
-
-# BLE: um lado anuncia, o outro escaneia
 adb shell am start -n $PKG/.MainActivity --es action bleadv
 adb shell am start -n $PKG/.MainActivity --es action blescan
-
-# hotspot local: sobe e mostra SSID/senha no log
 adb shell am start -n $PKG/.MainActivity --es action hotspot
-
-# entra num hotspot (mostra o diálogo do sistema)
 adb shell am start -n $PKG/.MainActivity --es action join --es ssid "..." --es pass "..."
-
-# transferência: um lado serve, o outro envia 32 MB
 adb shell am start -n $PKG/.MainActivity --es action serve
 adb shell am start -n $PKG/.MainActivity --es action send:192.168.0.10
-
-# acompanhar
 adb logcat -s QuicklyDropDiag:I
 ```
 
+## Validation from Phase 0
+
+Measurements from 2026-11-01, 16 MB transfer, devices about 20 cm apart. These numbers
+come from the lab, not from the product app.
+
+| Path | Setup | Throughput |
+|---|---|---|
+| BLE (discovery) | 0.1–0.6 s | — |
+| NFC (tap → credentials) | 0.02 s | — |
+| Wi-Fi Direct (tap → group) | 0.86 s (median) | 35–48 MB/s |
+| LocalOnlyHotspot + `WifiNetworkSpecifier` | 7–10 s (system dialog) | 10–12 MB/s |
+| Common LAN | 0.3–3.6 s | 1.6–5.7 MB/s |
+
+Test devices:
+
+| Device | Android | Notes |
+|---|---|---|
+| Motorola Edge 50 Ultra | 17 (SDK 37) | Wi-Fi Direct; no `wifi_aware` service; UWB present |
+| Samsung Galaxy S21 (SM-G991B) | 15 (SDK 35) | Wi-Fi Direct; Wi-Fi Aware available |
+
 ## Roadmap
 
-- [x] Fase 0 — validar hardware, escolher transporte, medir throughput
-- [ ] Fase 1 — MVP: descoberta, handshake, transferência com hash, UI
-- [ ] Fase 2 — NFC tap-to-share, RSSI calibrado, UWB
-- [ ] Fase 3 — interoperabilidade com Quick Share (opcional)
+- [x] Phase 0 — validate hardware, choose transports, measure throughput
+- [x] Protocol v1 — discovery payload, Noise NK, framing, transfer state
+- [x] Lifecycle spike code — execution still pending
+- [x] Product alpha — NFC + Wi-Fi Direct send/receive
+- [ ] Hardware validation of the product
+- [ ] Hotspot/LAN fallback, resume, history and trusted devices
+- [ ] Quick Share interoperability (optional)
 
-## Licença
+## License
 
-[GPL-3.0](LICENSE). Projetos derivados devem permanecer abertos.
+[GPL-3.0](LICENSE). Derivative projects must remain open.

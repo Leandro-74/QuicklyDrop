@@ -1,89 +1,107 @@
-# Segurança
+# Security
 
-> Modelo de ameaças do MVP. O que não está aqui não é promessa de segurança.
+> MVP threat model. Anything not listed here is not a security promise.
 
-## 1. Decisão
+## 1. Decision
 
 - Handshake: **Noise NK** (`Noise_NK_25519_ChaChaPoly_SHA256`).
-- Implementação: `org.signal.forks:noise-java:0.1.1` (MIT, fork mantido pelo Signal,
-  Java puro, sem JNI). Não é uma biblioteca auditada; a mitigação é testar contra
-  vetores oficiais e manter a superfície pequena.
-- OOB: a chave pública efêmera do receptor vai no payload NFC.
-- Transporte: ChaCha20-Poly1305, frames com prefixo de tamanho.
-- BLE: fora do produto. Permanece no laboratório.
+- Implementation: `org.signal.forks:noise-java:0.1.1` (MIT, Signal fork, pure Java,
+  no JNI). It is not an audited library; the mitigation is to test against official
+  vectors and keep the surface small.
+- OOB: the receiver's ephemeral public key travels in the NFC payload.
+- Transport: ChaCha20-Poly1305, frames with a length prefix.
+- BLE: out of the product. It stays in the lab.
 
-### 1.1 Por que Noise
+### 1.1 Why Noise
 
-Noise NK tem 1 RTT, não carrega certificado, não depende de PKI e cabe em um handshake
-de 96 bytes. É mais leve que TLS para este caso e não exige uma cadeia de confiança
-externa: a confiança vem do toque NFC.
+Noise NK has 1 RTT, carries no certificate, does not depend on PKI and fits in a 96-byte
+handshake. It is lighter than TLS for this case and does not require an external trust
+chain: trust comes from the NFC tap.
 
-### 1.2 O que o Noise não resolve
+### 1.2 What Noise does not solve
 
-- **Identidade do emissor.** NK autentica o receptor. O emissor é autorizado pela posse
-  do payload NFC, não por uma identidade persistente.
-- **Confidencialidade do tamanho.** O prefixo de tamanho do frame é visível.
-- **Disponibilidade.** Um atacante na mesma rede pode tentar abrir conexões e consumir
-  recursos; o receptor aceita uma sessão por janela e fecha por timeout.
-- **Conteúdo malicioso.** O app não é antivírus. O hash garante integridade, não
-  segurança do arquivo.
+- **Sender identity.** NK authenticates the receiver. The sender is authorized by
+  possession of the NFC payload, not by a persistent identity.
+- **Length confidentiality.** The frame length prefix is visible.
+- **Availability.** An attacker on the same network can open connections and consume
+  resources; the receiver accepts one session per window and closes by timeout.
+- **Malicious content.** The app is not an antivirus. The hash guarantees integrity, not
+  safety of the file.
 
-## 2. Modelo de ameaças
+## 2. Threat model
 
-| Ameaça | Cenário | Mitigação |
+| Threat | Scenario | Mitigation |
 |---|---|---|
-| Escuta passiva | Alguém no mesmo canal lê o tráfego | Noise ChaCha20-Poly1305 |
-| MITM | Atacante intercepta e troca chaves | Chave do receptor fixada pelo NFC; handshake falha |
-| Emissor não autorizado | Aparelho na rede sem tocar no receptor | Sem payload NFC não há chave nem credenciais |
-| Replay | Repetir um payload NFC capturado | Chaves e credenciais rotacionadas por janela; janela curta |
-| Path traversal | Nome `../../etc/passwd` | Sanitização antes do MediaStore |
-| Nome malicioso | NUL, controle, 500 caracteres | Whitelist, limite e truncamento |
-| Arquivo gigante | `size` mentiroso ou 1 TB | Limite local + espaço livre antes do Accept |
-| Hash divergente | Corrupção ou adulteração | SHA-256 no `End`; arquivo parcial apagado |
-| Segunda sessão | Outro aparelho tenta entrar | Uma sessão por janela; fecha após concluir |
-| DoS simples | Muitas conexões | Timeout de handshake, uma sessão, fecha a janela |
+| Passive eavesdropping | Someone on the same channel reads traffic | Noise ChaCha20-Poly1305 |
+| MITM | Attacker intercepts and swaps keys | Receiver key pinned by NFC; handshake fails |
+| Unauthorized sender | Device on the network without touching the receiver | Without the NFC payload there is no key or credentials |
+| Replay | Repeating a captured NFC payload | Keys and credentials rotate per window; short window |
+| Path traversal | Name `../../etc/passwd` | Sanitization before MediaStore |
+| Malicious name | NUL, control characters, 500 characters | Replacement, limit and truncation |
+| Huge file | False `size` or 1 TB | Local limit + free space before Accept |
+| Hash mismatch | Corruption or tampering | SHA-256 in `End`; partial file deleted |
+| Second session | Another device tries to join | One session per window; closes after completion |
+| Simple DoS | Many connections | Handshake timeout, one session, window closes |
 
-## 3. Aceite automático
+## 3. Automatic accept
 
-O receptor aceita sem diálogo quando **todas** as condições valem:
+The receiver accepts without a dialog when **all** conditions hold:
 
-1. A janela de recebimento está aberta.
-2. O handshake Noise NK concluiu com a chave publicada no NFC.
-3. É a primeira sessão da janela.
-4. Os metadados passam na validação (nome, tamanho, espaço).
-5. O hash do arquivo confere no `End`.
+1. The receive window is open.
+2. The Noise NK handshake completed with the key published over NFC.
+3. It is the first session in the window.
+4. Metadata passes validation (name, size, free space).
+5. The file hash matches at `End`.
 
-A justificativa é física: para completar o handshake, o emissor precisou ler o NFC do
-receptor. Quem não encostou não tem a chave nem as credenciais. O usuário continua com
-um botão **Cancelar** na notificação.
+The justification is physical: to complete the handshake, the sender had to read the
+receiver's NFC. Someone who did not touch the phone has neither the key nor the
+credentials. The user still has a **Cancel** action in the notification.
 
-Consequência explícita: **quem consegue encostar no receptor pode enviar um arquivo**.
-Isso é o comportamento desejado, equivalente a "receber de qualquer pessoa próxima",
-mas com prova de toque. Não é adequado para receber de desconhecidos em local público
-sem supervisão.
+Explicit consequence: **anyone who can touch the receiver can send a file.** This is the
+intended behavior, equivalent to "receive from anyone nearby", but with proof of touch.
+It is not suitable for receiving from strangers in a public place without supervision.
 
-## 4. Ciclo de vida das chaves
+## 4. Key lifecycle
 
-- Par X25519 gerado a cada janela de recebimento.
-- Chave pública no payload NFC; chave privada só na memória do receptor.
-- Nada de chave de sessão em disco.
-- Ao fechar a janela: limpar payload, descartar chaves, derrubar o grupo.
-- Sem "dispositivos confiáveis" no MVP. Se entrar, guardar apenas hash de chave pública
-  no Keystore, nunca a chave privada.
+- X25519 key pair generated for each receive window.
+- Public key in the NFC payload; private key only in the receiver's memory.
+- No session key on disk.
+- On window close: clear the payload, discard the keys and remove the P2P group.
+- No trusted devices in the MVP. If they are added, store only a public-key hash in the
+  Keystore, never the private key.
 
-## 5. BLE
+## 5. Storage
 
-O modo BLE do laboratório publica SSID e senha no GATT. Isso é aceitável apenas em
-laboratório. Para o produto:
+- Files are written through `MediaStore.Downloads` into `Download/QuicklyDrop`.
+- Names are sanitized against path separators and control characters and limited to 200
+  UTF-8 bytes.
+- Existing names get a `(1)`, `(2)` suffix.
+- Files are inserted as pending and published only after the SHA-256 matches.
+- Partial files are deleted on any failure path.
 
-- BLE não entra no MVP.
-- Se entrar, faz só descoberta; credenciais e chave são trocadas após handshake.
-- Precisa de SAS ou outro OOB, porque BLE não prova toque.
+## 6. BLE
 
-## 6. Pendências
+The lab BLE mode publishes SSID and password in the GATT characteristic. That is
+acceptable only in the lab. For the product:
 
-- Vetores oficiais do Noise no CI.
-- Teste de MITM com um proxy real entre os dois aparelhos.
-- Revisão de dependências e licenças (`THIRD_PARTY_NOTICES.md`).
-- Política de retenção de logs (não logar SSID, senha, nome de arquivo ou chave).
-- Revisão do `allowBackup` e das regras de extração de dados.
+- BLE is not in the MVP.
+- If it enters, it does discovery only; credentials and keys are exchanged after a
+  handshake.
+- It needs a SAS or another OOB mechanism, because BLE does not prove touch.
+
+## 7. Alpha caveats
+
+- The product has not been validated on physical devices.
+- Official Noise test vectors are not in CI yet.
+- No MITM test with a real proxy between two phones.
+- The Android HCE and foreground-service behavior with the screen off is unverified.
+- Dependency and license review is documented in `THIRD_PARTY_NOTICES.md`.
+
+## 8. Pending
+
+- Official Noise vectors in CI.
+- MITM test with a real proxy between two devices.
+- Review dependency and license metadata before store distribution.
+- Log retention policy: never log SSID, passphrase, file name or key material.
+- Review `allowBackup` and data extraction rules.
+- Hardware validation of the receive service and MediaStore paths.

@@ -1,43 +1,42 @@
-# Nome do projeto
+# Project name
 
-> Decisão: **QuicklyDrop**. O nome vale para o primeiro release e para o repositório.
+> Decision: **QuicklyDrop**. The name applies to the first release and the repository.
 
-## 1. Situação
+## 1. Situation
 
-O projeto nasceu como `EasyDrop`, mas o nome conflita com um projeto existente no
-PyPI/GitHub (`TheLastGimbus/easydrop`, CLI para AirDrop no Linux). O conflito é de busca e
-de identidade, não de código. Antes do primeiro release, o projeto foi renomeado para
+The project started as `EasyDrop`, but the name conflicts with an existing project on
+PyPI/GitHub (`TheLastGimbus/easydrop`, an AirDrop CLI for Linux). The conflict is about
+search and identity, not code. Before the first release, the project was renamed to
 `QuicklyDrop`.
 
-Identificadores atuais:
+Current identifiers:
 
-- Repositório: `Leandro-74/QuicklyDrop`.
-- `applicationId`: `dev.leandro.quicklydrop` (produto), `.lab` e `.diag`.
-- Namespace dos módulos: `dev.leandro.quicklydrop`.
-- Identificador de fio: `quicklydrop/1`.
+- Repository: `Leandro-74/QuicklyDrop`.
+- `applicationId`: `dev.leandro.quicklydrop` (product), `.lab` and `.diag`.
+- Module namespace: `dev.leandro.quicklydrop`.
+- Wire identifier: `quicklydrop/1`.
 
-O identificador de fio é estável a partir do primeiro release e não muda com o nome
-comercial. Uma mudança de fio exige uma versão nova do protocolo.
+The wire identifier is stable from the first release and does not change with the
+commercial name. Changing the wire identifier requires a new protocol version.
 
-## 2. O que verificar antes do release público
+## 2. What to check before a public release
 
-- PyPI, npm, GitHub, F-Droid, Google Play e registro de domínio.
-- Marca e nome de pacote no F-Droid.
-- Disponibilidade de `dev.leandro.quicklydrop`.
-- Conflito com "Quick Drop" (Samsung) e "Quick Share" (Google) na busca.
+- PyPI, npm, GitHub, F-Droid, Google Play and domain registration.
+- Trademark and package name on F-Droid.
+- Availability of `dev.leandro.quicklydrop`.
+- Conflict with "Quick Drop" (Samsung) and "Quick Share" (Google) in search.
 
-## 3. O que não muda
+## 3. What does not change
 
-- Diretório do projeto, depois da migração para `QuicklyDrop`.
-- Namespace dos módulos.
-- Identificador de fio: `quicklydrop/1`.
-- Formato do payload NFC e do protocolo.
+- Module namespace.
+- Wire identifier: `quicklydrop/1`.
+- NFC payload and protocol format.
 
-## 4. Migração, se o nome mudar de novo
+## 4. Migration if the name changes again
 
-1. Nome de exibição e ícone.
-2. `applicationId` e namespace.
-3. Nome do repositório e dos artefatos.
-4. Metadados do F-Droid.
-5. README e capturas.
-6. Identificador de fio somente em uma versão nova do protocolo.
+1. Display name and icon.
+2. `applicationId` and namespace.
+3. Repository name and artifacts.
+4. F-Droid metadata.
+5. README and screenshots.
+6. Wire identifier only in a new protocol version.
