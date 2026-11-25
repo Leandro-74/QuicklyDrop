@@ -16,10 +16,10 @@ import android.os.Looper
 class NfcBeam(private val activity: Activity) {
 
     companion object {
-        /** AID próprio: F0 + "QDROP". */
+        /** Lab AID: F0 + "QDROL". Kept distinct from the product AID. */
         private val SELECT = byteArrayOf(
             0x00, 0xA4.toByte(), 0x04, 0x00, 0x06,
-            0xF0.toByte(), 0x51, 0x44, 0x52, 0x4F, 0x50, 0x00,
+            0xF0.toByte(), 0x51, 0x44, 0x52, 0x4F, 0x4C, 0x00,
         )
         private val GET_DATA = byteArrayOf(0x80.toByte(), 0xCA.toByte(), 0x00, 0x00, 0x00)
 
