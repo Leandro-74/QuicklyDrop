@@ -38,6 +38,7 @@ jobs:
           :app:assembleDebug
           :lab:assembleDebug
           :diag:assembleDebug
+          :app:lintDebug
           --console=plain
 
       - name: Upload results

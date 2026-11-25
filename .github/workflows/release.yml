@@ -27,6 +27,14 @@ jobs:
 
       - uses: gradle/actions/setup-gradle@v4
 
+      - name: Test
+        run: >
+          ./gradlew
+          :protocol:test
+          :core:testDebugUnitTest
+          :app:testDebugUnitTest
+          --console=plain
+
       - name: Decode keystore
         env:
           KEYSTORE_BASE64: ${{ secrets.QUICKLYDROP_KEYSTORE_BASE64 }}
@@ -48,11 +56,11 @@ jobs:
         uses: softprops/action-gh-release@v2
         with:
           files: QuicklyDrop-${{ github.ref_name }}.apk
-          prerelease: true
+          prerelease: ${{ contains(github.ref_name, '-') }}
           body: |
-            First alpha release of QuicklyDrop.
+            QuicklyDrop ${{ github.ref_name }}.
 
-            This build has not been validated on physical devices yet. NFC discovery,
+            This build may not have been validated on physical devices. NFC discovery,
             Wi-Fi Direct and MediaStore are implemented against the measured lab
             protocol, but real-device behavior may still fail. Please report issues
             with device model, Android version and logcat output.
