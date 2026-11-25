@@ -1,0 +1,41 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">QuicklyDrop</string>
+    <string name="app_tagline">Send files by touching two phones</string>
+    <string name="app_privacy">No account. No cloud. No server.</string>
+    <string name="home_note">Both phones need QuicklyDrop and NFC.</string>
+    <string name="more_files">+%1$d more</string>
+    <string name="ok">OK</string>
+
+    <string name="receive_files">Receive files</string>
+    <string name="send_files">Send files</string>
+    <string name="cancel">Cancel</string>
+    <string name="done">Done</string>
+    <string name="back">Back</string>
+    <string name="retry">Try again</string>
+
+    <string name="receive_ready">Ready to receive</string>
+    <string name="receive_tap">Tap the sender\'s phone to this phone.</string>
+    <string name="receive_keep_open">Keep the app open while the transfer runs.</string>
+    <string name="receive_cancel">Stop receiving</string>
+    <string name="receiving">Receiving %1$s</string>
+    <string name="receive_complete">Receive complete</string>
+    <string name="receive_failed">Receive failed</string>
+
+    <string name="send_scan">Scan receiver</string>
+    <string name="send_tap">Tap the receiver\'s phone to start.</string>
+    <string name="send_keep_open">Keep this screen open while the transfer runs.</string>
+    <string name="sending">Sending %1$s</string>
+    <string name="send_complete">Send complete</string>
+    <string name="send_failed">Send failed</string>
+    <string name="send_cancel">Cancel sending</string>
+    <string name="scanning">Waiting for the receiver\'s NFC tag…</string>
+
+    <string name="permission_needed">Wi-Fi permission is required to transfer files.</string>
+    <string name="no_files">No files were selected.</string>
+    <string name="file_read_failed">Could not read the selected files.</string>
+    <string name="working">Working…</string>
+    <string name="transfer_progress">%1$s of %2$s</string>
+    <string name="file_count">%1$d file(s)</string>
+    <string name="ready_to_send">Ready to send</string>
+</resources>
