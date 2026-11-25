@@ -18,7 +18,7 @@ import dev.leandro.quicklydrop.lab.P2pConfig
  */
 object SpikeActions {
 
-    private const val GROUP_SSID = "DIRECT-ED-SPIKE"
+    private const val GROUP_SSID = "DIRECT-QD-SPIKE"
     private const val GROUP_PASS = "spike123456"
     private const val GROUP_FREQUENCY = 5745
 

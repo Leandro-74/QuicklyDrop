@@ -108,7 +108,7 @@ class WifiDirectMode(
         val manager = manager ?: return
         val channel = channel ?: return
 
-        val ssid = "DIRECT-ED-${randomToken(4)}"
+        val ssid = "DIRECT-QD-${randomToken(4)}"
         val pass = randomToken(12)
 
         val listener = object : WifiP2pManager.ActionListener {
