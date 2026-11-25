@@ -8,6 +8,7 @@ internal class FakeP2pTransport(
 ) : P2pTransport {
 
     var removeCalls = 0
+    var cancelCalls = 0
     var closed = false
     var createdSsid: String? = null
     var createdPass: String? = null
@@ -26,6 +27,10 @@ internal class FakeP2pTransport(
     override fun connect(ssid: String, pass: String, frequencyMhz: Int): String {
         connectedSsid = ssid
         return host
+    }
+
+    override fun cancel() {
+        cancelCalls++
     }
 
     override fun close() {

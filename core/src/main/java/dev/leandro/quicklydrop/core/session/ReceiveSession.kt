@@ -18,6 +18,7 @@ import java.net.ServerSocket
 import java.net.Socket
 import java.net.SocketTimeoutException
 import java.security.SecureRandom
+import java.util.concurrent.CancellationException
 import java.util.concurrent.atomic.AtomicBoolean
 
 /**
@@ -66,6 +67,7 @@ class ReceiveSession(
         cancelled.set(true)
         runCatching { server?.close() }
         runCatching { socket?.close() }
+        runCatching { p2p.cancel() }
     }
 
     fun run(): TransferResult {
@@ -75,14 +77,17 @@ class ReceiveSession(
 
         val result = try {
             p2p.removeGroup()
+            ensureActive()
 
             val ssid = "DIRECT-QD-${token(4)}"
             val pass = token(12)
             val frequency = p2p.createGroup(ssid, pass, config.groupFrequencyMhz)
+            ensureActive()
 
             val listening = TcpSockets.openServer(config.port, config.acceptTimeoutMs)
             server = listening
             localPort = listening.localPort
+            ensureActive()
 
             val handshake = NoiseHandshake.responder()
             val payload = DiscoveryPayload(
@@ -98,10 +103,12 @@ class ReceiveSession(
             val accepted = TcpSockets.accept(listening)
             socket = accepted
             clear()
+            ensureActive()
 
             accepted.soTimeout = config.handshakeTimeoutMs
             NoiseStream.read(handshake, accepted.getInputStream())
             NoiseStream.write(handshake, accepted.getOutputStream())
+            ensureActive()
 
             accepted.soTimeout = config.idleTimeoutMs
             val channel = SecureChannel(
@@ -139,6 +146,10 @@ class ReceiveSession(
     }
 
     override fun close() = cancel()
+
+    private fun ensureActive() {
+        if (cancelled.get()) throw CancellationException("cancelled")
+    }
 
     private fun closeQuietly() {
         runCatching { socket?.close() }

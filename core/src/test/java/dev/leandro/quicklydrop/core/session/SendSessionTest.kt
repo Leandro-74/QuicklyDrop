@@ -90,6 +90,16 @@ class SendSessionTest {
     }
 
     @Test
+    fun `cancel requests p2p cleanup without blocking`() {
+        val p2p = FakeP2pTransport()
+        val session = SendSession(p2p = p2p, files = emptyList())
+
+        session.cancel()
+
+        assertEquals(1, p2p.cancelCalls)
+    }
+
+    @Test
     fun `rejects a non p2p payload`() {
         val payload = DiscoveryPayload(
             name = "Receiver",

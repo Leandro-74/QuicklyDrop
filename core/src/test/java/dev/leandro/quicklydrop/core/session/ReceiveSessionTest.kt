@@ -110,8 +110,9 @@ class ReceiveSessionTest {
     fun `cancel interrupts an armed session`() {
         val armed = CountDownLatch(1)
         val result = AtomicReference<TransferResult>()
+        val p2p = FakeP2pTransport()
         val session = ReceiveSession(
-            p2p = FakeP2pTransport(),
+            p2p = p2p,
             sink = TestFileSink(),
             displayName = "Receiver",
             listener = object : ReceiveSession.Listener {
@@ -134,5 +135,6 @@ class ReceiveSessionTest {
             TransferFailure.CANCELLED,
             (result.get() as TransferResult.Failure).failure,
         )
+        assertEquals(1, p2p.cancelCalls)
     }
 }

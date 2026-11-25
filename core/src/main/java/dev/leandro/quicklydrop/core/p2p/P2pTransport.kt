@@ -18,6 +18,14 @@ interface P2pTransport : Closeable {
     /** Joins a group created by [ssid] and returns the group owner address. */
     fun connect(ssid: String, pass: String, frequencyMhz: Int): String
 
+    /**
+     * Requests cancellation without waiting for framework callbacks.
+     *
+     * Safe to call from the main thread. The blocking session still performs its full
+     * cleanup in [close] on the worker thread.
+     */
+    fun cancel()
+
     override fun close()
 }
 

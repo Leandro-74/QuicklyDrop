@@ -16,6 +16,7 @@ import java.io.Closeable
 import java.io.IOException
 import java.net.Socket
 import java.net.SocketTimeoutException
+import java.util.concurrent.CancellationException
 import java.util.concurrent.atomic.AtomicBoolean
 
 /**
@@ -39,6 +40,7 @@ class SendSession(
     fun cancel() {
         cancelled.set(true)
         runCatching { socket?.close() }
+        runCatching { p2p.cancel() }
     }
 
     fun run(payload: DiscoveryPayload): TransferResult {
@@ -54,15 +56,20 @@ class SendSession(
 
         val result = try {
             p2p.removeGroup()
+            ensureActive()
+
             val host = p2p.connect(payload.ssid, payload.pass, payload.frequencyMhz)
+            ensureActive()
 
             val connected = TcpSockets.connect(host, config.port, config.handshakeTimeoutMs)
             socket = connected
+            ensureActive()
             connected.soTimeout = config.handshakeTimeoutMs
 
             val handshake = NoiseHandshake.initiator(payload.noisePublicKey)
             NoiseStream.write(handshake, connected.getOutputStream())
             NoiseStream.read(handshake, connected.getInputStream())
+            ensureActive()
 
             connected.soTimeout = config.idleTimeoutMs
             val channel = SecureChannel(
@@ -99,4 +106,8 @@ class SendSession(
     }
 
     override fun close() = cancel()
+
+    private fun ensureActive() {
+        if (cancelled.get()) throw CancellationException("cancelled")
+    }
 }

@@ -24,6 +24,9 @@ class AndroidP2pTransport(
     private val manager: WifiP2pManager
     private var channel: WifiP2pManager.Channel?
 
+    @Volatile
+    private var cancelled = false
+
     init {
         val appContext = context.applicationContext
         manager = appContext.getSystemService(WifiP2pManager::class.java)
@@ -47,26 +50,29 @@ class AndroidP2pTransport(
 
     override fun createGroup(ssid: String, pass: String, frequencyMhz: Int): Int {
         val current = requireChannel()
+        if (cancelled) throw P2pException("cancelled")
         try {
             create(current, ssid, pass, frequencyMhz)
         } catch (e: P2pException) {
-            if (frequencyMhz == 0) throw e
+            if (frequencyMhz == 0 || cancelled) throw e
             create(current, ssid, pass, 0)
         }
+        if (cancelled) throw P2pException("cancelled")
         return awaitGroupFrequency(current)
     }
 
     override fun connect(ssid: String, pass: String, frequencyMhz: Int): String {
         val current = requireChannel()
+        if (cancelled) throw P2pException("cancelled")
         try {
             join(current, ssid, pass, frequencyMhz)
         } catch (e: P2pException) {
-            if (frequencyMhz == 0) throw e
+            if (frequencyMhz == 0 || cancelled) throw e
             join(current, ssid, pass, 0)
         }
 
         val deadline = System.currentTimeMillis() + groupTimeoutMs
-        while (System.currentTimeMillis() < deadline) {
+        while (!cancelled && System.currentTimeMillis() < deadline) {
             val info = connectionInfo(current)
             if (info?.groupFormed == true) {
                 return info.groupOwnerAddress?.hostAddress
@@ -74,10 +80,20 @@ class AndroidP2pTransport(
             }
             sleep(500)
         }
+        if (cancelled) throw P2pException("cancelled")
         throw P2pException("group did not form in ${groupTimeoutMs}ms")
     }
 
+    override fun cancel() {
+        cancelled = true
+        val current = channel ?: return
+        runCatching { manager.stopPeerDiscovery(current, null) }
+        runCatching { manager.cancelConnect(current, null) }
+        runCatching { manager.removeGroup(current, null) }
+    }
+
     override fun close() {
+        cancelled = true
         val current = channel ?: return
         runCatching { manager.stopPeerDiscovery(current, null) }
         runCatching { manager.cancelConnect(current, null) }
@@ -109,11 +125,12 @@ class AndroidP2pTransport(
 
     private fun awaitGroupFrequency(current: WifiP2pManager.Channel): Int {
         val deadline = System.currentTimeMillis() + 5_000
-        while (System.currentTimeMillis() < deadline) {
+        while (!cancelled && System.currentTimeMillis() < deadline) {
             val frequency = groupInfo(current)?.frequency ?: 0
             if (frequency > 0) return frequency
             sleep(300)
         }
+        if (cancelled) throw P2pException("cancelled")
         return 0
     }
 
