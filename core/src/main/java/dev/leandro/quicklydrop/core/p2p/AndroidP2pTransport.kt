@@ -1,12 +1,15 @@
 package dev.leandro.quicklydrop.core.p2p
 
+import android.annotation.SuppressLint
 import android.content.Context
+import android.net.wifi.WifiManager
 import android.net.wifi.p2p.WifiP2pGroup
 import android.net.wifi.p2p.WifiP2pInfo
 import android.net.wifi.p2p.WifiP2pManager
 import android.os.Looper
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.TimeUnit
+import java.util.concurrent.atomic.AtomicBoolean
 import java.util.concurrent.atomic.AtomicReference
 
 /**
@@ -15,6 +18,7 @@ import java.util.concurrent.atomic.AtomicReference
  * All operations are blocking and must be called from a worker thread. The framework
  * callbacks stay on the main looper; the worker only waits for them.
  */
+@SuppressLint("MissingPermission") // Checked by P2pPermissions; action() handles SecurityException.
 class AndroidP2pTransport(
     context: Context,
     private val operationTimeoutMs: Long = 10_000,
@@ -22,6 +26,7 @@ class AndroidP2pTransport(
 ) : P2pTransport {
 
     private val manager: WifiP2pManager
+    private val wifiManager: WifiManager?
     private var channel: WifiP2pManager.Channel?
 
     @Volatile
@@ -29,6 +34,7 @@ class AndroidP2pTransport(
 
     init {
         val appContext = context.applicationContext
+        wifiManager = appContext.getSystemService(WifiManager::class.java)
         manager = appContext.getSystemService(WifiP2pManager::class.java)
             ?: throw P2pException("Wi-Fi Direct is not available")
         channel = try {
@@ -41,21 +47,19 @@ class AndroidP2pTransport(
 
     override fun removeGroup() {
         val current = channel ?: return
-        try {
-            action(REMOVE_TIMEOUT_MS) { manager.removeGroup(current, it) }
-        } catch (_: P2pException) {
-            // No group or a framework BUSY; there is nothing else to clean up here.
-        }
+        remove(current)
     }
 
     override fun createGroup(ssid: String, pass: String, frequencyMhz: Int): Int {
         val current = requireChannel()
-        if (cancelled) throw P2pException("cancelled")
+        ensureReady()
         try {
-            create(current, ssid, pass, frequencyMhz)
+            retryOnBusy { create(current, ssid, pass, frequencyMhz) }
         } catch (e: P2pException) {
-            if (frequencyMhz == 0 || cancelled) throw e
-            create(current, ssid, pass, 0)
+            // BUSY means the framework is still tearing a group down, not that the
+            // frequency is unsupported. Retrying on another channel would also fail.
+            if (frequencyMhz == 0 || cancelled || e.reason == WifiP2pManager.BUSY) throw e
+            retryOnBusy { create(current, ssid, pass, 0) }
         }
         if (cancelled) throw P2pException("cancelled")
         return awaitGroupFrequency(current)
@@ -63,12 +67,12 @@ class AndroidP2pTransport(
 
     override fun connect(ssid: String, pass: String, frequencyMhz: Int): String {
         val current = requireChannel()
-        if (cancelled) throw P2pException("cancelled")
+        ensureReady()
         try {
-            join(current, ssid, pass, frequencyMhz)
+            retryOnBusy { join(current, ssid, pass, frequencyMhz) }
         } catch (e: P2pException) {
-            if (frequencyMhz == 0 || cancelled) throw e
-            join(current, ssid, pass, 0)
+            if (frequencyMhz == 0 || cancelled || e.reason == WifiP2pManager.BUSY) throw e
+            retryOnBusy { join(current, ssid, pass, 0) }
         }
 
         val deadline = System.currentTimeMillis() + groupTimeoutMs
@@ -95,10 +99,31 @@ class AndroidP2pTransport(
     override fun close() {
         cancelled = true
         val current = channel ?: return
+        channel = null
         runCatching { manager.stopPeerDiscovery(current, null) }
         runCatching { manager.cancelConnect(current, null) }
-        removeGroup()
-        channel = null
+        runCatching { remove(current) }
+        runCatching { current.close() }
+    }
+
+    private fun remove(current: WifiP2pManager.Channel) {
+        // removeGroup fails with BUSY when no group exists and, on some devices, leaves
+        // the framework in a state where the next createGroup is also BUSY.
+        val state = queryGroupInfo(current)
+        if (state.answered && state.group == null) return
+
+        try {
+            retryOnBusy {
+                action(REMOVE_TIMEOUT_MS) { manager.removeGroup(current, it) }
+            }
+        } catch (_: P2pException) {
+            // No group or a framework BUSY; createGroup retries the teardown race.
+            return
+        }
+
+        // removeGroup only acknowledges the request. createGroup answers BUSY until the
+        // group actually disappears, which can take a moment on Samsung devices.
+        awaitGroupGone(current)
     }
 
     private fun create(
@@ -126,7 +151,7 @@ class AndroidP2pTransport(
     private fun awaitGroupFrequency(current: WifiP2pManager.Channel): Int {
         val deadline = System.currentTimeMillis() + FREQUENCY_TIMEOUT_MS
         while (!cancelled && System.currentTimeMillis() < deadline) {
-            val frequency = groupInfo(current)?.frequency ?: 0
+            val frequency = queryGroupInfo(current).group?.frequency ?: 0
             if (frequency > 0) return frequency
             sleep(FREQUENCY_POLL_MS)
         }
@@ -134,19 +159,30 @@ class AndroidP2pTransport(
         return 0
     }
 
-    private fun groupInfo(current: WifiP2pManager.Channel): WifiP2pGroup? {
+    private fun awaitGroupGone(current: WifiP2pManager.Channel) {
+        val deadline = System.currentTimeMillis() + GROUP_GONE_TIMEOUT_MS
+        while (!cancelled && System.currentTimeMillis() < deadline) {
+            val state = queryGroupInfo(current)
+            if (state.answered && state.group == null) return
+            sleep(GROUP_GONE_POLL_MS)
+        }
+    }
+
+    private fun queryGroupInfo(current: WifiP2pManager.Channel): GroupState {
         val latch = CountDownLatch(1)
-        val result = AtomicReference<WifiP2pGroup?>()
+        val group = AtomicReference<WifiP2pGroup?>()
+        val answered = AtomicBoolean(false)
         try {
             manager.requestGroupInfo(current) {
-                result.set(it)
+                group.set(it)
+                answered.set(true)
                 latch.countDown()
             }
         } catch (e: SecurityException) {
             throw P2pException("Wi-Fi Direct permission denied", e)
         }
         latch.await(GROUP_INFO_TIMEOUT_MS, TimeUnit.MILLISECONDS)
-        return result.get()
+        return GroupState(answered.get(), group.get())
     }
 
     private fun connectionInfo(current: WifiP2pManager.Channel): WifiP2pInfo? {
@@ -162,6 +198,26 @@ class AndroidP2pTransport(
         }
         latch.await(GROUP_INFO_TIMEOUT_MS, TimeUnit.MILLISECONDS)
         return result.get()
+    }
+
+    /**
+     * Retries a framework action while it answers BUSY.
+     *
+     * The framework answers BUSY while a previous group is being removed and while its
+     * state machine is settling, both of which clear on their own after a short wait.
+     */
+    private fun <T> retryOnBusy(block: () -> T): T {
+        var attempt = 0
+        while (true) {
+            try {
+                return block()
+            } catch (e: P2pException) {
+                if (e.reason != WifiP2pManager.BUSY || attempt >= BUSY_RETRIES) throw e
+                attempt++
+                sleep(BUSY_RETRY_MS * attempt)
+                if (cancelled) throw P2pException("cancelled")
+            }
+        }
     }
 
     private fun action(
@@ -191,11 +247,25 @@ class AndroidP2pTransport(
         if (!latch.await(timeoutMs, TimeUnit.MILLISECONDS)) {
             throw P2pException("Wi-Fi Direct operation timed out")
         }
-        failure.get()?.let { throw P2pException("Wi-Fi Direct failed: ${reasonName(it)}") }
+        failure.get()?.let { reason ->
+            val message = if (reason == WifiP2pManager.BUSY) {
+                "Wi-Fi Direct is busy; turn Wi-Fi off and on and try again"
+            } else {
+                "Wi-Fi Direct failed: ${reasonName(reason)}"
+            }
+            throw P2pException(message, reason = reason)
+        }
     }
 
     private fun requireChannel(): WifiP2pManager.Channel =
         channel ?: throw P2pException("Wi-Fi Direct is closed")
+
+    private fun ensureReady() {
+        if (cancelled) throw P2pException("cancelled")
+        if (wifiManager?.isWifiEnabled == false) {
+            throw P2pException("Wi-Fi is off; turn it on to use Wi-Fi Direct")
+        }
+    }
 
     private fun sleep(millis: Long) {
         try {
@@ -213,11 +283,17 @@ class AndroidP2pTransport(
         else -> "code $reason"
     }
 
+    private class GroupState(val answered: Boolean, val group: WifiP2pGroup?)
+
     private companion object {
         const val REMOVE_TIMEOUT_MS = 2_000L
         const val GROUP_INFO_TIMEOUT_MS = 2_000L
         const val FREQUENCY_TIMEOUT_MS = 5_000L
         const val FREQUENCY_POLL_MS = 300L
         const val CONNECT_POLL_MS = 500L
+        const val GROUP_GONE_TIMEOUT_MS = 3_000L
+        const val GROUP_GONE_POLL_MS = 150L
+        const val BUSY_RETRIES = 3
+        const val BUSY_RETRY_MS = 300L
     }
 }

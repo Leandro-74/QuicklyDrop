@@ -29,5 +29,13 @@ interface P2pTransport : Closeable {
     override fun close()
 }
 
-/** Wi-Fi Direct failure with a message suitable for the UI and logs. */
-class P2pException(message: String, cause: Throwable? = null) : Exception(message, cause)
+/**
+ * Wi-Fi Direct failure with a message suitable for the UI and logs.
+ *
+ * [reason] is the framework failure code when the framework reported one.
+ */
+class P2pException(
+    message: String,
+    cause: Throwable? = null,
+    val reason: Int? = null,
+) : Exception(message, cause)
